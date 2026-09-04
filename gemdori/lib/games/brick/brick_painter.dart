@@ -93,6 +93,10 @@ class BrickPainter extends CustomPainter {
       // 주요 로직 : 기호 뒤에 **배경색 원**을 깐다 (2026-09-04).
       //   생성 아이템은 벽돌과 **같은 색**을 쓰므로(파란 벽돌 안의 파란 ■■),
       //   깔아 주지 않으면 테두리와 겹쳐 보이지 않는다.
+      //
+      // ⛔ **이 원이 벽돌 테두리를 살짝 가리는 것은 그대로 둔다** (2026-09-04 확정).
+      //   의도한 것은 아니었으나 기호가 벽돌 위에 얹힌 **입체감**으로 읽혀 더 낫다.
+      //   「테두리가 끊긴다」를 결함으로 보고 고치지 말 것.
       if (b.item != null) {
         canvas.drawCircle(rect.center, 9, Paint()..color = const Color(0xFF12161C));
         drawItemMark(canvas, rect.center, b.item!, 6);
