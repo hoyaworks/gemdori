@@ -62,13 +62,20 @@ enum ItemType {
   slowBall(ItemKind.help, ItemDuration.timed, ItemClass.buff, seconds: 10), //      3 ▼
   paddleGrow(ItemKind.help, ItemDuration.untilLost, ItemClass.gear), //             4 ◀ ▶
 
-  // ── 방해 (경고색 계열) ──
-  brickRevive(ItemKind.harm, ItemDuration.instant, ItemClass.consumable), //        5 ■ ■
-  reverse(ItemKind.harm, ItemDuration.timed, ItemClass.buff, seconds: 4), //        6 ◐
-  paddleShrink(ItemKind.harm, ItemDuration.untilLost, ItemClass.gear), //           7 ▶ ◀
-  fastBall(ItemKind.harm, ItemDuration.timed, ItemClass.buff, seconds: 10); //      8 ▲
+  // ── 방해 ──
+  //   벽돌 생성 3종 — **색이 곧 생기는 벽돌의 색**이다 (2026-09-04)
+  brickSpawnBlue(ItemKind.harm, ItemDuration.instant, ItemClass.consumable,
+      spawnHp: 1), //                                                             5 ■■ 파랑
+  brickSpawnYellow(ItemKind.harm, ItemDuration.instant, ItemClass.consumable,
+      spawnHp: 2), //                                                             6 ■■ 노랑
+  brickSpawnRed(ItemKind.harm, ItemDuration.instant, ItemClass.consumable,
+      spawnHp: 3), //                                                             7 ■■ 빨강
+  reverse(ItemKind.harm, ItemDuration.timed, ItemClass.buff, seconds: 4), //        8 ◐
+  paddleShrink(ItemKind.harm, ItemDuration.untilLost, ItemClass.gear), //           9 ▶ ◀
+  fastBall(ItemKind.harm, ItemDuration.timed, ItemClass.buff, seconds: 10); //     10 ▲
 
-  const ItemType(this.kind, this.duration, this.cls, {this.seconds = 0});
+  const ItemType(this.kind, this.duration, this.cls,
+      {this.seconds = 0, this.spawnHp = 0});
 
   final ItemKind kind;
   final ItemDuration duration;
@@ -78,6 +85,15 @@ enum ItemType {
 
   /// 시간형일 때의 지속 시간(초)
   final double seconds;
+
+  /// 벽돌 생성 아이템이면 **생기는 벽돌의 내구도**(1 파랑 / 2 노랑 / 3 빨강). 아니면 0.
+  ///
+  /// 주요 로직 : 「되살린다(RE)」가 아니라 **「새로 만든다(NEW)」** 다 (2026-09-04).
+  ///   원래 그 줄이 무슨 색이었는지는 아무도 기억하지 못한다.
+  ///   대신 **먹은 아이템 색이 곧 생기는 벽돌 색**이라, 규칙이 눈에 보인다.
+  final int spawnHp;
+
+  bool get isBrickSpawn => spawnHp > 0;
 
   bool get isHelp => kind == ItemKind.help;
 

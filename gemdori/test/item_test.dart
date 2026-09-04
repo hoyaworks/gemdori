@@ -27,11 +27,12 @@ void main() {
   paddleClampTests();
   multiBallRefillTests();
   group('아이템 정의', () {
-    test('도움 4종 · 방해 4종', () {
+    test('도움 4종 · 방해 6종 (생성 3색 포함)', () {
       final help = ItemType.values.where((t) => t.isHelp).length;
       final harm = ItemType.values.where((t) => !t.isHelp).length;
       expect(help, 4);
-      expect(harm, 4);
+      expect(harm, 6);
+      expect(ItemType.values.where((t) => t.isBrickSpawn).length, 3);
     });
 
     test('반대 짝이 서로를 가리킨다', () {
@@ -42,8 +43,11 @@ void main() {
       expect(ItemType.multiBall.opposite, isNull);
     });
 
-    test('벽돌 부활만 즉발형', () {
-      expect(ItemType.brickRevive.duration, ItemDuration.instant);
+    test('벽돌 생성 3종만 즉발형', () {
+      final instant =
+          ItemType.values.where((t) => t.duration == ItemDuration.instant);
+      expect(instant.map((t) => t.spawnHp), [1, 2, 3]);
+      expect(ItemType.brickSpawnBlue.duration, ItemDuration.instant);
       expect(ItemType.paddleGrow.duration, ItemDuration.untilLost);
       expect(ItemType.multiBall.duration, ItemDuration.untilLost);
       expect(ItemType.reverse.duration, ItemDuration.timed);
@@ -272,8 +276,8 @@ void main() {
     test('2초가 지나면 사라진다', () {
       final s = make(stage: 1);
       s.status = GameStatus.playing;
-      s.applyItem(ItemType.brickRevive);
-      expect(s.flashItem, ItemType.brickRevive);
+      s.applyItem(ItemType.brickSpawnBlue);
+      expect(s.flashItem, ItemType.brickSpawnBlue);
 
       for (var i = 0; i < 3 * 60; i++) {
         s.update(1 / 60);
@@ -382,32 +386,82 @@ void main() {
   group('벽돌 부활', () {
     // 2026-09-04 — 부활한 벽돌은 빈 벽돌이어야 한다.
     //   부활 아이템이 든 벽돌을 깨서 부활시켰더니 같은 아이템이 또 나왔다.
-    test('되살아난 벽돌에는 아이템이 없다', () {
+    test('새로 생긴 벽돌에는 아이템이 없다', () {
       final s = make(stage: 9); // 아이템이 많이 심기는 스테이지
       s.status = GameStatus.playing;
       final row = s.brickRows - 1;
       for (final b in s.bricks.where((b) => b.row == row)) {
         b.hp = 0;
       }
-      s.applyItem(ItemType.brickRevive);
+      s.applyItem(ItemType.brickSpawnBlue);
 
-      final revived = s.bricks.where((b) => b.row == row).toList();
-      expect(revived.every((b) => b.alive), isTrue, reason: '되살아났다');
-      expect(revived.every((b) => b.item == null), isTrue,
+      final made = s.bricks.where((b) => b.row == row).toList();
+      expect(made.every((b) => b.alive), isTrue, reason: '새로 생겼다');
+      expect(made.every((b) => b.item == null), isTrue,
           reason: '아이템은 딸려 오지 않는다');
     });
 
-    test('깨진 줄 중 가장 아래 한 줄이 되살아난다', () {
+    test('깨진 줄 중 가장 아래 줄에 새로 생긴다', () {
       final s = make();
       for (final b in s.bricks.where((b) => b.row == s.brickRows - 1)) {
         b.hp = 0;
       }
       expect(s.remainingBricks, s.bricks.length - s.brickCols);
 
-      s.applyItem(ItemType.brickRevive);
+      s.applyItem(ItemType.brickSpawnBlue);
 
       expect(s.remainingBricks, s.bricks.length);
       expect(s.effects, isEmpty, reason: '즉발형이라 효과로 남지 않는다');
+    });
+
+    // 2026-09-04 — 색이 곧 생기는 벽돌 색이다 (RE 가 아니라 NEW)
+    test('먹은 아이템 색으로 생긴다 — 원래 그 줄 색이 아니다', () {
+      final s = make(stage: 3); // 줄 구성 1 3 1 — 가운데가 빨강
+      final row = 1;
+      final was = s.bricks.firstWhere((b) => b.row == row).hp;
+      expect(was, 3, reason: '원래는 빨강 줄');
+      for (final b in s.bricks.where((b) => b.row == row)) {
+        b.hp = 0;
+      }
+      s.applyItem(ItemType.brickSpawnBlue);
+      expect(s.bricks.where((b) => b.row == row).every((b) => b.hp == 1), isTrue,
+          reason: '파랑 아이템을 먹었으니 파란 줄로 생긴다');
+    });
+
+    test('살아 있는 벽돌은 건드리지 않는다', () {
+      final s = make(stage: 3);
+      final row = 1;
+      final line = s.bricks.where((b) => b.row == row).toList();
+      for (final b in line.take(3)) {
+        b.hp = 0;
+      }
+      s.applyItem(ItemType.brickSpawnYellow);
+
+      expect(line.take(3).every((b) => b.hp == 2), isTrue, reason: '빈 자리만 노랑');
+      expect(line.skip(3).every((b) => b.hp == 3), isTrue,
+          reason: '살아 있던 빨강은 그대로');
+    });
+
+    test('스테이지별로 나올 수 있는 색이 다르다', () {
+      expect(BrickState.spawnColorsFor(1), [ItemType.brickSpawnBlue]);
+      expect(BrickState.spawnColorsFor(5), [ItemType.brickSpawnBlue]);
+      expect(BrickState.spawnColorsFor(6).length, 2);
+      expect(BrickState.spawnColorsFor(8).length, 2);
+      expect(BrickState.spawnColorsFor(9).length, 3);
+      expect(BrickState.spawnColorsFor(11).length, 3);
+    });
+
+    test('심을 때 스테이지가 허용하지 않는 색은 안 나온다', () {
+      for (final stage in [1, 5, 7, 11]) {
+        final s = make(stage: stage);
+        final allowed = BrickState.spawnColorsFor(stage);
+        final planted = s.bricks
+            .where((b) => b.item != null && b.item!.isBrickSpawn)
+            .map((b) => b.item!);
+        for (final t in planted) {
+          expect(allowed, contains(t), reason: 'STAGE $stage');
+        }
+      }
     });
   });
 
@@ -544,8 +598,9 @@ void main() {
       final gear = ItemType.values.where((t) => t.cls == ItemClass.gear);
       final con = ItemType.values.where((t) => t.cls == ItemClass.consumable);
       expect(buff.length, 4, reason: '무적·감속·반전·증속');
+      expect(ItemType.values.length, 10);
       expect(gear.length, 3, reason: '멀티공·패들 확대·축소');
-      expect(con.length, 1, reason: '벽돌 부활');
+      expect(con.length, 3, reason: '벽돌 생성 3색');
     });
 
     test('장비는 걸려 있어도 상단에 안 올라간다', () {

@@ -33,13 +33,16 @@ const Map<int, Color> kBrickColors = {
 /// 아이템 종류별 색 — 도움은 푸른색·초록 계열, 방해는 경고색 계열
 const Map<ItemType, Color> kItemColors = {
   ItemType.invincibleBall: Color(0xFF7CF9FF), // 1 ◉ 밝은 시안 (2026-09-03 강화)
-  ItemType.multiBall: Color(0xFF6FC3FF), //      2 ◎ 하늘
+  ItemType.multiBall: Color(0xFFC08BFF), //      2 ◎ 보라 (생성 파랑과 겹쳐 2026-09-04 이동)
   ItemType.slowBall: Color(0xFF7BE38B), //       3 ▼ 초록
   ItemType.paddleGrow: Color(0xFF4FD1A5), //     4 ◀▶ 청녹
-  ItemType.brickRevive: Color(0xFF6FC3FF), //    5 ■■ 파랑 — 되살아나는 벽돌 색 (2026-09-04)
-  ItemType.reverse: Color(0xFFFF7BAC), //        6 ◐ 자홍
-  ItemType.paddleShrink: Color(0xFFFF8A3D), //   7 ▶◀ 주황빨강
-  ItemType.fastBall: Color(0xFFFF4D4D), //       8 ▲ 빨강
+  // 생성 3종 — **벽돌 색을 그대로 쓴다.** 색이 곧 「무엇이 생기는가」다
+  ItemType.brickSpawnBlue: Color(0xFF6FC3FF), //   5 ■■
+  ItemType.brickSpawnYellow: Color(0xFFFFD86B), // 6 ■■
+  ItemType.brickSpawnRed: Color(0xFFFF6B6B), //    7 ■■
+  ItemType.reverse: Color(0xFFFF7BAC), //        8 ◐ 자홍
+  ItemType.paddleShrink: Color(0xFFFF8A3D), //   9 ▶◀ 주황빨강
+  ItemType.fastBall: Color(0xFFFF4D4D), //      10 ▲ 빨강
 };
 
 /// 공 기본색 — 패들과 같은 흰빛
@@ -86,7 +89,12 @@ class BrickPainter extends CustomPainter {
           ..strokeWidth = 3,
       );
       // 아이템을 품은 벽돌은 표시해 준다 — 먼저 깨거나 피하는 선택이 생기도록
+      //
+      // 주요 로직 : 기호 뒤에 **배경색 원**을 깐다 (2026-09-04).
+      //   생성 아이템은 벽돌과 **같은 색**을 쓰므로(파란 벽돌 안의 파란 ■■),
+      //   깔아 주지 않으면 테두리와 겹쳐 보이지 않는다.
       if (b.item != null) {
+        canvas.drawCircle(rect.center, 9, Paint()..color = const Color(0xFF12161C));
         drawItemMark(canvas, rect.center, b.item!, 6);
       }
     }
@@ -177,7 +185,9 @@ void drawItemMark(Canvas canvas, Offset c, ItemType type, double s) {
     case ItemType.paddleShrink: // ▶ ◀ (안쪽)
       _sideTriangle(canvas, c.translate(-s * 0.75, 0), s * 0.8, paint, left: false);
       _sideTriangle(canvas, c.translate(s * 0.75, 0), s * 0.8, paint, left: true);
-    case ItemType.brickRevive: // ■ ■
+    case ItemType.brickSpawnBlue: // ■ ■
+    case ItemType.brickSpawnYellow:
+    case ItemType.brickSpawnRed:
       final w = s * 0.7;
       canvas.drawRect(
         Rect.fromCenter(center: c.translate(-s * 0.6, 0), width: w, height: w),

@@ -452,7 +452,7 @@ class BrickState {
   }
 
   void _applyInstant(ItemType t) {
-    if (t == ItemType.brickRevive) _reviveOneRow();
+    if (t.isBrickSpawn) _spawnBrickRow(t.spawnHp);
   }
 
   /// 먹은 아이템을 화면 가운데 잠깐 띄운다 — 모든 스테이지에서.
@@ -464,20 +464,46 @@ class BrickState {
     flashLeft = itemFlashSeconds;
   }
 
-  /// 깨진 벽돌이 있는 줄 중 가장 아래 한 줄을 되살린다.
-  void _reviveOneRow() {
+  /// 깨진 벽돌이 있는 줄 중 **가장 아래 줄의 빈 자리**에 새 벽돌을 만든다 (2026-09-04).
+  ///
+  /// 주요 로직 : 「되살리기(RE)」가 아니라 **「새로 만들기(NEW)」** 다.
+  ///   ① 색은 원래 그 줄의 색이 아니라 **먹은 아이템 색**(hp)으로 정한다 —
+  ///      원래 무슨 색이었는지는 아무도 기억하지 못하므로, 규칙이 눈에 보이지 않는다.
+  ///   ② **살아 있는 벽돌은 건드리지 않는다** — 줄 전체를 덮으면 때려 놓은 진행이
+  ///      사라지고, 빨강이 파랑으로 바뀌면 오히려 이득이 되어 버린다.
+  ///   ③ **아이템은 넣지 않는다** — 생성 아이템이 든 벽돌을 깨서 또 생성 아이템이
+  ///      나오면, 방금 한 놀이를 그대로 다시 하는 느낌이 된다.
+  void _spawnBrickRow(int hp) {
     for (var r = _rowHp.length - 1; r >= 0; r--) {
       final row = bricks.where((b) => b.row == r).toList();
       if (row.every((b) => b.alive)) continue;
       for (final b in row) {
-        b.hp = _rowHp[r];
-        // 부활한 벽돌은 **빈 벽돌**로 되살린다 (2026-09-04).
-        //   부활 아이템이 든 벽돌을 깨서 부활시켰더니 같은 아이템이 또 나와,
-        //   방금 한 놀이를 그대로 다시 하는 느낌이 됐다.
+        if (b.alive) continue;
+        b.hp = hp;
         b.item = null;
       }
       return;
     }
+  }
+
+  /// 이 스테이지에 나올 수 있는 벽돌 생성 아이템 색 (2026-09-04).
+  ///
+  /// 주요 로직 : 속도 구간과 **일부러 어긋나게** 나눴다.
+  ///   난이도가 오르는 계단이 스테이지마다 다른 요소로 와야
+  ///   「앞이랑 똑같은데」 하는 느낌이 덜하다.
+  ///     1~5   파랑
+  ///     6~8   파랑 + 노랑
+  ///     9~11  파랑 + 노랑 + 빨강
+  static List<ItemType> spawnColorsFor(int stage) {
+    if (stage <= 5) return const [ItemType.brickSpawnBlue];
+    if (stage <= 8) {
+      return const [ItemType.brickSpawnBlue, ItemType.brickSpawnYellow];
+    }
+    return const [
+      ItemType.brickSpawnBlue,
+      ItemType.brickSpawnYellow,
+      ItemType.brickSpawnRed,
+    ];
   }
 
   /// 걸려 있는 효과를 전부 지운다. 공을 놓치거나 스테이지가 바뀔 때.
@@ -614,7 +640,14 @@ class BrickState {
         : 0.0;
 
     final help = ItemType.values.where((t) => t.isHelp).toList();
-    final harm = ItemType.values.where((t) => !t.isHelp).toList();
+    // 생성 계열은 **한 슬롯으로 묶어** 뽑는다 (2026-09-04).
+    //   색이 3종이라고 뽑힐 확률까지 3배가 되면 방해 아이템이 생성 일색이 된다.
+    //   슬롯이 뽑히면 그때 스테이지가 허용하는 색 중에서 고른다.
+    final harm = [
+      ...ItemType.values.where((t) => !t.isHelp && !t.isBrickSpawn),
+      ItemType.brickSpawnBlue, // 생성 대표 슬롯
+    ];
+    final spawnColors = spawnColorsFor(stage);
     final free = [...bricks];
 
     void place(int count, List<ItemType> pool, bool wantTough) {
@@ -632,7 +665,10 @@ class BrickState {
           if (pick <= 0) break;
         }
         final target = free.removeAt(idx);
-        final type = pool[_random.nextInt(pool.length)];
+        var type = pool[_random.nextInt(pool.length)];
+        if (type.isBrickSpawn) {
+          type = spawnColors[_random.nextInt(spawnColors.length)];
+        }
         final replaced = Brick(target.row, target.col, target.hp, item: type);
         bricks[bricks.indexOf(target)] = replaced;
       }
