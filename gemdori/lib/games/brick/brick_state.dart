@@ -471,6 +471,10 @@ class BrickState {
       if (row.every((b) => b.alive)) continue;
       for (final b in row) {
         b.hp = _rowHp[r];
+        // 부활한 벽돌은 **빈 벽돌**로 되살린다 (2026-09-04).
+        //   부활 아이템이 든 벽돌을 깨서 부활시켰더니 같은 아이템이 또 나와,
+        //   방금 한 놀이를 그대로 다시 하는 느낌이 됐다.
+        b.item = null;
       }
       return;
     }
@@ -965,15 +969,29 @@ class BrickState {
       final hitSide = (wasLeft && v.dx > 0) || (wasRight && v.dx < 0);
       final hitFace = (wasAbove && v.dy > 0) || (wasBelow && v.dy < 0);
 
+      final overlapX = (r0 + r.width / 2) - (next.dx - r.center.dx).abs();
+      final overlapY = (r0 + r.height / 2) - (next.dy - r.center.dy).abs();
+
+      // 이미 겹친 채로 시작한 경우 — 위아래로 처리하되 **되꺾지 않는다** (2026-09-04 수정).
+      //
+      //   증상 : 벽돌과 벽돌 사이 틈에 낀 공이 충돌 뒤 **벽돌 위로 순간이동**했다.
+      //   원인 : 되꺾기는 「면을 거울처럼 접는」 계산이라, 공이 면에서 깊이 들어와 있을수록
+      //          반대편으로 **그만큼 멀리** 튄다. 틈에 낀 상태는 이미 깊이 들어와 있다.
+      //   대책 : 이 경우만 **면에 붙여** 놓고 축을 뒤집는다. 그 프레임에 못 간 거리는
+      //          아주 짧아, 순간이동보다 훨씬 눈에 덜 띈다.
+      //   ⚠️ 축을 「덜 파고든 쪽」으로 고르면 **벽 붙어 상승 문제가 되살아난다**
+      //      (2026-09-02 에 잡았던 것). 이 경우는 예전처럼 **언제나 위아래**로 푼다.
+      if (!hitSide && !hitFace) {
+        final face = v.dy > 0 ? r.top - r0 : r.bottom + r0;
+        next = Offset(next.dx, face);
+        v = Offset(v.dx, -v.dy);
+        break;
+      }
+
       var reflectX = hitSide;
       if (hitSide && hitFace) {
         // 모서리로 들어온 경우 — 덜 파고든 축으로 튕긴다
-        final overlapX = (r0 + r.width / 2) - (next.dx - r.center.dx).abs();
-        final overlapY = (r0 + r.height / 2) - (next.dy - r.center.dy).abs();
         reflectX = overlapX < overlapY;
-      } else if (!hitSide && !hitFace) {
-        // 이미 겹친 채로 시작한 예외 — 위아래로 처리한다
-        reflectX = false;
       }
 
       // 2026-09-03 : 벽과 같은 이유로 **파고든 만큼 되꺾어** 준다.

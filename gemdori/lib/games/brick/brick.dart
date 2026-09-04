@@ -33,7 +33,8 @@ class Brick {
 
   /// 품고 있는 아이템. 완전히 깨질 때 떨어뜨린다.
   /// 화면에는 아이콘으로 미리 표시한다 — 먼저 깨거나 피하는 선택이 생기도록.
-  final ItemType? item;
+  /// 이 벽돌에 든 아이템. 부활한 벽돌은 비워 두므로 final 이 아니다 (2026-09-04)
+  ItemType? item;
 
   bool get alive => hp > 0;
 }

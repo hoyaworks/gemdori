@@ -36,7 +36,7 @@ const Map<ItemType, Color> kItemColors = {
   ItemType.multiBall: Color(0xFF6FC3FF), //      2 ◎ 하늘
   ItemType.slowBall: Color(0xFF7BE38B), //       3 ▼ 초록
   ItemType.paddleGrow: Color(0xFF4FD1A5), //     4 ◀▶ 청녹
-  ItemType.brickRevive: Color(0xFFFFB03A), //    5 ■■ 주황
+  ItemType.brickRevive: Color(0xFF6FC3FF), //    5 ■■ 파랑 — 되살아나는 벽돌 색 (2026-09-04)
   ItemType.reverse: Color(0xFFFF7BAC), //        6 ◐ 자홍
   ItemType.paddleShrink: Color(0xFFFF8A3D), //   7 ▶◀ 주황빨강
   ItemType.fastBall: Color(0xFFFF4D4D), //       8 ▲ 빨강

@@ -56,6 +56,7 @@ void main() {
   multiBallTests();
   pauseTests();
   fieldAspectTests();
+  overlapStartTests();
 }
 
 void ballTests() {
@@ -1071,6 +1072,46 @@ void fieldAspectTests() {
 
     test('빈 공간이 오면 0 을 준다', () {
       expect(BrickState.fitField(Size.zero), Size.zero);
+    });
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  겹친 채 시작한 충돌 (2026-09-04)
+// ═══════════════════════════════════════════════════════════════════
+//
+//  증상 : 벽돌 사이 틈에 낀 공이 충돌 뒤 **벽돌 위로 순간이동**했다.
+//  원인 : 되꺾기(거울 접기)는 면에서 깊이 들어와 있을수록 반대편으로 멀리 보낸다.
+void overlapStartTests() {
+  group('겹친 채 시작한 충돌', () {
+    test('벽돌 위로 순간이동하지 않는다', () {
+      final s = BrickState(fieldSize: const Size(400, 600), stage: 1);
+      s.status = GameStatus.playing;
+      final b = s.bricks.firstWhere((b) => b.row == 1 && b.col == 3);
+      final rect = s.brickRect(b);
+
+      // 벽돌 한가운데에서 아래로 — 어느 면으로 들어왔는지가 사라진 상태
+      s.ballPos = rect.center;
+      s.ballVelocity = const Offset(0, 300);
+      s.update(1 / 60);
+
+      final face = rect.top - s.ballRadius;
+      expect(s.ballPos.dy, closeTo(face, 0.001), reason: '윗면에 붙여 내보낸다');
+      expect(s.ballVelocity.dy, lessThan(0), reason: '위로 튕긴다');
+    });
+
+    test('위로 가던 중이면 아랫면으로 내보낸다', () {
+      final s = BrickState(fieldSize: const Size(400, 600), stage: 1);
+      s.status = GameStatus.playing;
+      final b = s.bricks.firstWhere((b) => b.row == 1 && b.col == 3);
+      final rect = s.brickRect(b);
+
+      s.ballPos = rect.center;
+      s.ballVelocity = const Offset(0, -300);
+      s.update(1 / 60);
+
+      expect(s.ballPos.dy, closeTo(rect.bottom + s.ballRadius, 0.001));
+      expect(s.ballVelocity.dy, greaterThan(0), reason: '아래로 튕긴다');
     });
   });
 }

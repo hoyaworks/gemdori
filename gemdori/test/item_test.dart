@@ -380,6 +380,23 @@ void main() {
   });
 
   group('벽돌 부활', () {
+    // 2026-09-04 — 부활한 벽돌은 빈 벽돌이어야 한다.
+    //   부활 아이템이 든 벽돌을 깨서 부활시켰더니 같은 아이템이 또 나왔다.
+    test('되살아난 벽돌에는 아이템이 없다', () {
+      final s = make(stage: 9); // 아이템이 많이 심기는 스테이지
+      s.status = GameStatus.playing;
+      final row = s.brickRows - 1;
+      for (final b in s.bricks.where((b) => b.row == row)) {
+        b.hp = 0;
+      }
+      s.applyItem(ItemType.brickRevive);
+
+      final revived = s.bricks.where((b) => b.row == row).toList();
+      expect(revived.every((b) => b.alive), isTrue, reason: '되살아났다');
+      expect(revived.every((b) => b.item == null), isTrue,
+          reason: '아이템은 딸려 오지 않는다');
+    });
+
     test('깨진 줄 중 가장 아래 한 줄이 되살아난다', () {
       final s = make();
       for (final b in s.bricks.where((b) => b.row == s.brickRows - 1)) {
