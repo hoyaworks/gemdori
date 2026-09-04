@@ -34,6 +34,35 @@ import 'item.dart';
 /// 게임 진행 상태
 enum GameStatus { ready, playing, cleared, gameOver }
 
+/// 소리를 붙일 「방금 일어난 일」 (2026-09-04)
+///
+/// 주요 로직 : 상태(BrickState)는 **소리를 재생하지 않는다.** 무슨 일이 있었는지만 남긴다.
+///   재생은 화면 쪽이 맡는다 — 여기서 오디오를 건드리면 화면 없이 도는
+///   테스트가 전부 깨지고, 규칙과 연출이 한 덩어리로 엉킨다.
+enum GameEventType {
+  launch, // 발사
+  wallHit, // 벽 반사
+  paddleHit, // 패들 반사
+  brickHit, // 벽돌에 맞았지만 안 깨짐
+  brickBroken, // 벽돌 깨짐
+  ballLost, // 공을 놓침
+  itemHelp, // 도움 아이템 획득
+  itemHarm, // 방해 아이템 획득
+}
+
+/// 일어난 일 하나. 벽돌 소리는 색(내구도)에 따라 음정을 달리하므로 값을 함께 싣는다.
+class GameEvent {
+  const GameEvent(this.type, {this.hp = 0});
+
+  final GameEventType type;
+
+  /// 벽돌 관련일 때의 내구도(1 파랑 · 2 노랑 · 3 빨강). 아니면 0
+  final int hp;
+
+  @override
+  String toString() => hp == 0 ? '$type' : '$type(hp:$hp)';
+}
+
 /// 스테이지 한 개의 정의
 class StageSpec {
   const StageSpec(this.rowHp, this.speedLevel, this.helpItems, this.harmItems);
@@ -251,6 +280,23 @@ class BrickState {
         : Size(available.width, available.width / fieldAspect);
   }
 
+  /// 아직 화면이 가져가지 않은 사건들.
+  ///
+  /// 주요 로직 : **화면이 가져가면서 비운다**(takeEvents). 상태가 프레임 시작에 비우면,
+  ///   update() 밖에서 일어나는 일(발사 등)이 읽히기도 전에 사라진다.
+  final List<GameEvent> _events = [];
+
+  void _emit(GameEventType t, {int hp = 0}) =>
+      _events.add(GameEvent(t, hp: hp));
+
+  /// 쌓인 사건을 가져가고 비운다. 화면이 매 프레임 한 번 부른다.
+  List<GameEvent> takeEvents() {
+    if (_events.isEmpty) return const [];
+    final out = List<GameEvent>.from(_events);
+    _events.clear();
+    return out;
+  }
+
   /// 일시정지 중인가 (2026-09-04)
   bool paused = false;
 
@@ -421,6 +467,7 @@ class BrickState {
     //      상쇄로 끝나는 경우(축소 걸린 상태에서 확대)에도 띄우는 것과 같은 이유로,
     //      상단에 남는지 여부로 예외를 둘 근거가 없다.
     _startItemFlash(t);
+    _emit(t.isHelp ? GameEventType.itemHelp : GameEventType.itemHarm);
 
     if (t == ItemType.slowBall) return _shiftSpeed(-1, t);
     if (t == ItemType.fastBall) return _shiftSpeed(1, t);
@@ -839,6 +886,7 @@ class BrickState {
     }
     status = GameStatus.playing;
     stageIntro = false;
+    _emit(GameEventType.launch);
   }
 
   /// 화면 크기가 바뀌면 공과 패들을 경기장 안으로 다시 넣는다.
@@ -957,16 +1005,19 @@ class BrickState {
     if (next.dx - r0 < 0) {
       next = Offset(2 * r0 - next.dx, next.dy);
       v = Offset(v.dx.abs(), v.dy);
+      _emit(GameEventType.wallHit);
     } else if (next.dx + r0 > fieldSize.width) {
       final limit = fieldSize.width - r0;
       next = Offset(2 * limit - next.dx, next.dy);
       v = Offset(-v.dx.abs(), v.dy);
+      _emit(GameEventType.wallHit);
     }
 
     // 2 위 벽
     if (next.dy - r0 < 0) {
       next = Offset(next.dx, 2 * r0 - next.dy);
       v = Offset(v.dx, v.dy.abs());
+      _emit(GameEventType.wallHit);
     }
 
     // 3 벽돌 — 공 하나가 한 프레임에 하나만 맞힌다.
@@ -976,8 +1027,11 @@ class BrickState {
       final r = brickRect(b);
       if (!_circleHitsRect(next, r, r0)) continue;
 
+      final hpBefore = b.hp;
       b.hp--;
       score++;
+      _emit(b.alive ? GameEventType.brickHit : GameEventType.brickBroken,
+          hp: hpBefore);
       if (!b.alive && b.item != null) {
         fallingItems.add(FallingItem(type: b.item!, pos: r.center));
       }
@@ -1054,6 +1108,7 @@ class BrickState {
       v = _bounceOffPaddle(x, v.distance);
       final dir = v / v.distance;
       next = Offset(next.dx, face) + dir * left;
+      _emit(GameEventType.paddleHit);
     }
 
     // 되꺾는 과정에서 경기장을 벗어날 수 있어 마지막에 한 번 가둔다
@@ -1077,6 +1132,7 @@ class BrickState {
 
   /// 공을 놓쳤을 때. 목숨이 남았으면 패들 위에서 다시 대기한다.
   void _loseBall() {
+    _emit(GameEventType.ballLost);
     clearEffects(); // 새 공으로 시작하면 효과는 전부 사라진다
     lives--;
     if (lives <= 0) {

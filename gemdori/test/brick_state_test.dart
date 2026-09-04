@@ -57,6 +57,7 @@ void main() {
   pauseTests();
   fieldAspectTests();
   overlapStartTests();
+  gameEventTests();
 }
 
 void ballTests() {
@@ -1112,6 +1113,94 @@ void overlapStartTests() {
 
       expect(s.ballPos.dy, closeTo(rect.bottom + s.ballRadius, 0.001));
       expect(s.ballVelocity.dy, greaterThan(0), reason: '아래로 튕긴다');
+    });
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  사건 기록 — 소리를 붙이기 위한 준비 (2026-09-04)
+// ═══════════════════════════════════════════════════════════════════
+//
+//  주요 로직 : 상태는 소리를 내지 않고 **무슨 일이 있었는지만** 남긴다.
+//    화면이 가져가면서 비운다. 상태가 프레임 시작에 비우면,
+//    update() 밖에서 일어나는 발사 같은 사건이 읽히기도 전에 사라진다.
+void gameEventTests() {
+  group('사건 기록', () {
+    test('가져가면 비워진다', () {
+      final s = BrickState(fieldSize: const Size(400, 600));
+      s.launch();
+      expect(s.takeEvents().map((e) => e.type), [GameEventType.launch]);
+      expect(s.takeEvents(), isEmpty, reason: '두 번 읽히지 않는다');
+    });
+
+    test('벽에 맞으면 남는다', () {
+      final s = playing(
+        ballPos: const Offset(12, 300), // 반지름 8 — 한 걸음이면 왼쪽 벽에 닿는다
+        ballVelocity: const Offset(-300, 0),
+      );
+      s.update(1 / 30);
+      expect(s.takeEvents().map((e) => e.type), contains(GameEventType.wallHit));
+    });
+
+    test('패들에 맞으면 남는다', () {
+      final s = playing(
+        ballPos: const Offset(200, 520),
+        ballVelocity: const Offset(0, 300),
+        paddleX: 200,
+      );
+      for (var i = 0; i < 20; i++) {
+        s.update(1 / 60);
+      }
+      expect(s.takeEvents().map((e) => e.type),
+          contains(GameEventType.paddleHit));
+    });
+
+    test('벽돌은 맞음과 깨짐을 구분하고 색을 함께 남긴다', () {
+      final s = BrickState(fieldSize: const Size(400, 600), stage: 3);
+      s.status = GameStatus.playing;
+      // 빨강(hp 3) 줄을 골라 세 번 맞힌다
+      final b = s.bricks.firstWhere((b) => b.hp == 3);
+      final rect = s.brickRect(b);
+      final types = <GameEventType>[];
+      final hps = <int>[];
+      for (var i = 0; i < 3; i++) {
+        s.ballPos = Offset(rect.center.dx, rect.bottom + s.ballRadius + 2);
+        s.ballVelocity = const Offset(0, -300);
+        s.update(1 / 60);
+        for (final e in s.takeEvents()) {
+          if (e.type == GameEventType.brickHit ||
+              e.type == GameEventType.brickBroken) {
+            types.add(e.type);
+            hps.add(e.hp);
+          }
+        }
+      }
+      expect(types, [
+        GameEventType.brickHit,
+        GameEventType.brickHit,
+        GameEventType.brickBroken,
+      ]);
+      expect(hps, [3, 2, 1], reason: '맞기 직전 색을 싣는다');
+    });
+
+    test('아이템은 도움과 방해를 구분한다', () {
+      final s = BrickState(fieldSize: const Size(400, 600));
+      s.applyItem(ItemType.paddleGrow);
+      s.applyItem(ItemType.paddleShrink);
+      expect(s.takeEvents().map((e) => e.type),
+          [GameEventType.itemHelp, GameEventType.itemHarm]);
+    });
+
+    test('공을 놓치면 남는다', () {
+      final s = playing(
+        ballPos: const Offset(200, 590),
+        ballVelocity: const Offset(0, 300),
+      );
+      for (var i = 0; i < 10; i++) {
+        s.update(1 / 60);
+      }
+      expect(s.takeEvents().map((e) => e.type),
+          contains(GameEventType.ballLost));
     });
   });
 }
