@@ -1050,11 +1050,12 @@ void pauseTests() {
 //    위아래로 길면 공이 오가는 시간이 늘어 쉬워진다.
 void fieldAspectTests() {
   group('경기장 비율', () {
-    test('어떤 공간이 와도 9:16 을 지킨다', () {
+    test('어떤 공간이 와도 정해진 비율을 지킨다', () {
       const cases = [Size(1000, 600), Size(400, 900), Size(360, 640)];
       for (final c in cases) {
         final f = BrickState.fitField(c);
-        expect(f.width / f.height, closeTo(9 / 16, 0.0001), reason: '$c');
+        expect(f.width / f.height, closeTo(BrickState.fieldAspect, 0.0001),
+            reason: '$c');
         expect(f.width, lessThanOrEqualTo(c.width + 0.001));
         expect(f.height, lessThanOrEqualTo(c.height + 0.001));
       }

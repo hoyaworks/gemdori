@@ -107,27 +107,26 @@ class BrickPainter extends CustomPainter {
     final flashIdx = state.invincibleColorIndex;
     final ballColor =
         flashIdx == null ? kBallColor : kInvincibleBallColors[flashIdx];
-    // 주요 로직 : ◉ 도 **바깥 지름이 ● 와 같다** (2026-09-04 수정).
-    //   처음에는 링을 공 밖에 둘렀더니 무적일 때만 공이 커 보였다.
-    //   공 크기는 조준 감각과 직결되므로, 링은 **공 안쪽을 파서** 만든다.
-    //   가운데 점(0.34) + 링(0.44~1.0) 사이의 빈틈이 ◉ 로 읽히게 한다.
+    // 주요 로직 : 공은 **언제나 같은 크기의 단색 원 하나**다 (2026-09-04 확정).
+    //   그 원이 곧 충돌 판정 크기이므로, 연출 때문에 커지거나 작아지면 안 된다.
+    //   무적 연출은 **뒤에 깔리는 배경공(링)** 이 맡는다.
+    //     · 링의 안쪽 지름 = 공 지름  → 공이 링에 딱 맞물려 보인다
+    //     · 색은 공과 같이 바뀌고, **깜빡임(나타났다 사라졌다)은 링에만** 준다
+    //   그리는 순서도 규칙이다 — 링을 먼저 깔고 공을 그 위에 얹는다.
     final ring = state.invincibleRingOn;
     for (final ball in state.balls) {
       final r = ball.radius;
-      final paint = Paint()..color = ballColor;
-      if (!ring) {
-        canvas.drawCircle(ball.pos, r, paint);
-        continue;
+      if (ring) {
+        canvas.drawCircle(
+          ball.pos,
+          r * 1.25, // 안쪽 r ~ 바깥 1.5r
+          Paint()
+            ..color = ballColor
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = r * 0.5,
+        );
       }
-      canvas.drawCircle(ball.pos, r * 0.34, paint);
-      canvas.drawCircle(
-        ball.pos,
-        r * 0.72,
-        Paint()
-          ..color = ballColor
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = r * 0.56,
-      );
+      canvas.drawCircle(ball.pos, r, Paint()..color = ballColor);
     }
   }
 

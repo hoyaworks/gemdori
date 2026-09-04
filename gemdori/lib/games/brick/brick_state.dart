@@ -231,8 +231,11 @@ class BrickState {
   List<ItemType> get hudEffects =>
       ItemType.values.where((t) => t.isBuff && effects.containsKey(t)).toList();
 
-  /// 경기장 가로세로 비율 — 모바일 세로(9:16) 고정 (2026-09-04)
-  static const double fieldAspect = 9 / 16;
+  /// 경기장 가로세로 비율 — **3:4 고정** (2026-09-04)
+  ///
+  /// 상세 설명 : 처음엔 모바일 세로(9:16)로 잡았는데 **좌우가 답답했다**.
+  ///   위아래 여백이 남더라도 폭을 넓히는 쪽이 낫다는 판단.
+  static const double fieldAspect = 3 / 4;
 
   /// 주어진 공간 안에서 9:16 을 지키는 가장 큰 경기장 크기.
   ///
