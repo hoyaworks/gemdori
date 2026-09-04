@@ -102,12 +102,12 @@ void main() {
     });
 
     test('표 밖으로는 안 나간다 — 끝단에서는 시간만 다시 찬다', () {
-      final s = make(stage: 11); // 단계 3 = 480
+      final s = make(stage: 11); // 단계 5 = 670
       s.applyItem(ItemType.fastBall);
-      expect(s.ballSpeed, 570, reason: '최고 단계');
+      expect(s.ballSpeed, 780, reason: '최고 단계');
 
       s.applyItem(ItemType.fastBall);
-      expect(s.ballSpeed, 570, reason: '더 올라가지 않는다');
+      expect(s.ballSpeed, 780, reason: '더 올라가지 않는다');
       expect(s.speedLeft, ItemType.fastBall.seconds, reason: '시간은 리셋된다');
     });
 
@@ -151,8 +151,8 @@ void main() {
     });
 
     test('끝단이라 단계가 안 바뀌면 깜빡이지 않는다', () {
-      final s = make(stage: 11); // 단계 3
-      s.applyItem(ItemType.fastBall); // 4 로
+      final s = make(stage: 11); // 단계 5
+      s.applyItem(ItemType.fastBall); // 6 으로
       s.speedFlash = 0;
       s.applyItem(ItemType.fastBall); // 더 못 올라감
       expect(s.speedFlash, 0);

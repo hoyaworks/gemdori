@@ -55,6 +55,7 @@ void main() {
   sampleStageTests();
   multiBallTests();
   pauseTests();
+  fieldAspectTests();
 }
 
 void ballTests() {
@@ -462,14 +463,25 @@ void stageTests() {
       }
     });
 
-    test('공 속도 단계 — 1~3 은 1, 4~10 은 2, 11 은 3', () {
+    // 2026-09-04 재배치 — 1·2=1 / 3~5=2 / 6~8=3 / 9·10=4 / 11=5
+    test('스테이지별 속도 단계가 표대로다', () {
+      const expected = [1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 5];
+      expect(BrickState.stages.length, expected.length);
       for (var i = 0; i < BrickState.stages.length; i++) {
-        final level = BrickState.stages[i].speedLevel;
-        final n = i + 1;
-        expect(level, n <= 3 ? 1 : (n <= 10 ? 2 : 3), reason: 'STAGE $n');
+        expect(BrickState.stages[i].speedLevel, expected[i],
+            reason: 'STAGE ${i + 1}');
       }
-      // 2026-09-03 : 배수(%) 가 아니라 초당 픽셀 실제값으로 바꿨다
-      expect(BrickState.speedTable, [250, 300, 390, 480, 570]);
+      // 초당 픽셀 실제값 · 7단계 (2026-09-04 확장)
+      expect(BrickState.speedTable, [250, 300, 390, 480, 570, 670, 780]);
+      expect(BrickState.speedMarks.length, BrickState.speedTable.length,
+          reason: '기호와 단계 수가 어긋나면 화면에서 터진다');
+    });
+
+    test('최고 단계는 아이템으로만 닿는다 — 스테이지 기본은 ▲4 까지', () {
+      final top = BrickState.stages
+          .map((e) => e.speedLevel)
+          .reduce((a, b) => a > b ? a : b);
+      expect(top, BrickState.speedTable.length - 2);
     });
 
     test('단계표는 계속 빨라지기만 한다', () {
@@ -485,15 +497,15 @@ void stageTests() {
       s.loadStage(4);
       expect(s.ballSpeed, 390);
       s.loadStage(11);
-      expect(s.ballSpeed, 480);
+      expect(s.ballSpeed, 670);
     });
 
     test('스테이지가 넘어갈 때는 값만 바뀌고 깜빡이지 않는다', () {
       final s = BrickState(fieldSize: const Size(400, 600));
-      s.loadStage(3); // 3 → 4 에서 기본 단계가 달라진다
+      s.loadStage(2); // 2 → 3 에서 기본 단계가 달라진다
       expect(s.speedMark, BrickState.speedMarks[1]);
 
-      s.loadStage(4);
+      s.loadStage(3);
       expect(s.speedMark, BrickState.speedMarks[2], reason: '값은 바뀐다');
       expect(s.speedFlash, 0, reason: '깜빡임은 아이템으로 바뀐 경우에만');
       expect(s.speedBlinkOn, isTrue);
@@ -1026,6 +1038,38 @@ void pauseTests() {
       s.pause();
       s.loadStage(2);
       expect(s.paused, isFalse);
+    });
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  경기장 비율 (2026-09-04)
+// ═══════════════════════════════════════════════════════════════════
+//
+//  주요 로직 : 비율이 흔들리면 그것만으로 난이도가 변한다.
+//    위아래로 길면 공이 오가는 시간이 늘어 쉬워진다.
+void fieldAspectTests() {
+  group('경기장 비율', () {
+    test('어떤 공간이 와도 9:16 을 지킨다', () {
+      const cases = [Size(1000, 600), Size(400, 900), Size(360, 640)];
+      for (final c in cases) {
+        final f = BrickState.fitField(c);
+        expect(f.width / f.height, closeTo(9 / 16, 0.0001), reason: '$c');
+        expect(f.width, lessThanOrEqualTo(c.width + 0.001));
+        expect(f.height, lessThanOrEqualTo(c.height + 0.001));
+      }
+    });
+
+    test('넓적한 화면은 높이를, 좁고 긴 화면은 폭을 꽉 채운다', () {
+      final wide = BrickState.fitField(const Size(1000, 600));
+      expect(wide.height, 600, reason: '높이 기준으로 맞춘다');
+
+      final tall = BrickState.fitField(const Size(400, 2000));
+      expect(tall.width, 400, reason: '폭 기준으로 맞춘다');
+    });
+
+    test('빈 공간이 오면 0 을 준다', () {
+      expect(BrickState.fitField(Size.zero), Size.zero);
     });
   });
 }

@@ -143,30 +143,40 @@ class _BrickGameScreenState extends State<BrickGameScreen>
           },
           child: LayoutBuilder(
             builder: (context, constraints) {
-              final size = Size(constraints.maxWidth, constraints.maxHeight);
+              // 경기장은 9:16 고정. 남는 공간은 배경색으로 비운다 (2026-09-04).
+              // 입력 좌표가 경기장 기준이 되도록 SizedBox **안쪽**에 붙인다.
+              final size = BrickState.fitField(
+                Size(constraints.maxWidth, constraints.maxHeight),
+              );
               if (size != _state.fieldSize) {
                 _state.resize(size);
               }
-              return MouseRegion(
-                onHover: (e) => _movePaddle(e.localPosition),
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onPanUpdate: (e) => _movePaddle(e.localPosition),
-                  onTapDown: (e) {
-                    _focusNode.requestFocus(); // 클릭 후에도 스페이스가 먹도록
-                    _movePaddle(e.localPosition);
-                    _primaryAction();
-                  },
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      CustomPaint(
-                        size: size,
-                        painter: BrickPainter(_state),
+              return Center(
+                child: SizedBox(
+                  width: size.width,
+                  height: size.height,
+                  child: MouseRegion(
+                    onHover: (e) => _movePaddle(e.localPosition),
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onPanUpdate: (e) => _movePaddle(e.localPosition),
+                      onTapDown: (e) {
+                        _focusNode.requestFocus(); // 클릭 후에도 스페이스가 먹도록
+                        _movePaddle(e.localPosition);
+                        _primaryAction();
+                      },
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          CustomPaint(
+                            size: size,
+                            painter: BrickPainter(_state),
+                          ),
+                          _itemFlash(),
+                          _overlay(),
+                        ],
                       ),
-                      _itemFlash(),
-                      _overlay(),
-                    ],
+                    ),
                   ),
                 ),
               );
@@ -186,7 +196,7 @@ class _BrickGameScreenState extends State<BrickGameScreen>
     return Opacity(
       opacity: _state.speedBlinkOn ? 1 : 0.25,
       child: Text(
-        'SPEED (${_state.speedMark})',
+        'SPEED ${_state.speedMark}',
         style: const TextStyle(fontSize: 14, color: Color(0xFFBFC7D5)),
       ),
     );
