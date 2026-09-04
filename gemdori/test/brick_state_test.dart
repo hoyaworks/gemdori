@@ -54,6 +54,7 @@ void main() {
   gapTests();
   sampleStageTests();
   multiBallTests();
+  pauseTests();
 }
 
 void ballTests() {
@@ -939,6 +940,92 @@ void multiBallTests() {
           expect(b.velocity.distance, closeTo(s.ballSpeed, 0.001));
         }
       }
+    });
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  일시정지 (2026-09-04)
+// ═══════════════════════════════════════════════════════════════════
+//
+//  주요 로직 : 멈춘 동안 게임 시간이 한 톨도 흐르면 안 된다.
+//    공 위치·효과 남은 시간이 조금씩 밀리면 「멈췄는데 왜 달라졌지」가 된다.
+void pauseTests() {
+  group('일시정지', () {
+    test('멈추면 공이 움직이지 않는다', () {
+      final s = playing(
+        ballPos: const Offset(200, 300),
+        ballVelocity: const Offset(0, -300),
+      );
+      s.pause();
+      final before = s.ballPos;
+      for (var i = 0; i < 60; i++) {
+        s.update(1 / 60);
+      }
+      expect(s.ballPos, before);
+      expect(s.status, GameStatus.playing, reason: '진행 상태는 그대로다');
+    });
+
+    test('멈춘 동안 효과 시간도 줄지 않는다', () {
+      final s = playing(
+        ballPos: const Offset(200, 300),
+        ballVelocity: const Offset(0, -300),
+      );
+      s.applyItem(ItemType.invincibleBall);
+      final left = s.effects[ItemType.invincibleBall];
+      s.pause();
+      for (var i = 0; i < 120; i++) {
+        s.update(1 / 60);
+      }
+      expect(s.effects[ItemType.invincibleBall], left);
+    });
+
+    test('풀면 다시 움직인다', () {
+      final s = playing(
+        ballPos: const Offset(200, 300),
+        ballVelocity: const Offset(0, -300),
+      );
+      s.pause();
+      s.update(1 / 60);
+      s.resume();
+      final before = s.ballPos;
+      s.update(1 / 60);
+      expect(s.ballPos.dy, lessThan(before.dy));
+    });
+
+    test('PAUSE 글자는 켜졌다 꺼졌다 한다', () {
+      final s = playing(
+        ballPos: const Offset(200, 300),
+        ballVelocity: const Offset(0, -300),
+      );
+      s.pause();
+      final seen = <bool>{};
+      for (var i = 0; i < 120; i++) {
+        s.update(1 / 60);
+        seen.add(s.pauseBlinkOn);
+      }
+      expect(seen, containsAll([true, false]));
+    });
+
+    test('끝난 화면에서는 멈출 수 없다', () {
+      final s = playing(
+        ballPos: const Offset(200, 300),
+        ballVelocity: const Offset(0, -300),
+      );
+      s.status = GameStatus.gameOver;
+      expect(s.canPause, isFalse);
+      s.pause();
+      expect(s.paused, isFalse);
+    });
+
+    test('스테이지가 바뀌면 일시정지가 풀린다', () {
+      final s = playing(
+        ballPos: const Offset(200, 300),
+        ballVelocity: const Offset(0, -300),
+      );
+      s.pause();
+      s.loadStage(2);
+      expect(s.paused, isFalse);
     });
   });
 }

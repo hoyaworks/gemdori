@@ -231,6 +231,27 @@ class BrickState {
   List<ItemType> get hudEffects =>
       ItemType.values.where((t) => t.isBuff && effects.containsKey(t)).toList();
 
+  /// 일시정지 중인가 (2026-09-04)
+  bool paused = false;
+
+  /// 일시정지가 걸린 뒤 흐른 시간(초) — PAUSE 글자 깜빡임에만 쓴다
+  double pauseElapsed = 0;
+
+  /// PAUSE 글자를 지금 보일 것인가
+  bool get pauseBlinkOn =>
+      pauseElapsed % speedBlinkPeriod > speedBlinkPeriod / 2;
+
+  /// 일시정지를 걸 수 있는 상태인가 — 끝난 화면에서는 걸 것이 없다
+  bool get canPause => !isFinished;
+
+  void pause() {
+    if (!canPause) return;
+    paused = true;
+    pauseElapsed = 0;
+  }
+
+  void resume() => paused = false;
+
   /// 효과가 풀리기 전 예고로 깜빡일 시간(초)
   static const double effectWarnSeconds = 2;
 
@@ -279,19 +300,21 @@ class BrickState {
   ///
   /// 클리어 총점 = 각 줄의 내구도 합 × 7칸. 점수는 맞을 때마다 1점이므로
   /// 빨강 한 개가 3점이 되어 표의 총점과 저절로 맞는다.
+  /// ⚠️ 아이템 개수는 2026-09-04 에 **1.5배**로 올렸다 (반올림).
+  ///   예전 값 = 3/2 · 3/2 · 4/3 · 4/3 · 5/5 · 5/5 · 6/6 · 6/6 · 7/8 · 7/8 · 8/10
   static const List<StageSpec> stages = [
     //          줄 구성            속도  도움  방해
-    StageSpec([1, 1, 1], 1, 3, 2), //  1
-    StageSpec([1, 2, 1], 1, 3, 2), //  2
-    StageSpec([1, 3, 1], 1, 4, 3), //  3
-    StageSpec([1, 1, 1, 1, 1], 2, 4, 3), //  4
-    StageSpec([1, 1, 2, 1, 1], 2, 5, 5), //  5
-    StageSpec([1, 1, 3, 1, 1], 2, 5, 5), //  6
-    StageSpec([1, 2, 2, 2, 1], 2, 6, 6), //  7
-    StageSpec([1, 2, 3, 2, 1], 2, 6, 6), //  8
-    StageSpec([1, 3, 2, 3, 1], 2, 7, 8), //  9
-    StageSpec([3, 2, 1, 2, 3], 2, 7, 8), // 10
-    StageSpec([3, 2, 1, 2, 3], 3, 8, 10), // 11  10과 같은 구성 · 속도만 상승
+    StageSpec([1, 1, 1], 1, 5, 3), //  1
+    StageSpec([1, 2, 1], 1, 5, 3), //  2
+    StageSpec([1, 3, 1], 1, 6, 5), //  3
+    StageSpec([1, 1, 1, 1, 1], 2, 6, 5), //  4
+    StageSpec([1, 1, 2, 1, 1], 2, 8, 8), //  5
+    StageSpec([1, 1, 3, 1, 1], 2, 8, 8), //  6
+    StageSpec([1, 2, 2, 2, 1], 2, 9, 9), //  7
+    StageSpec([1, 2, 3, 2, 1], 2, 9, 9), //  8
+    StageSpec([1, 3, 2, 3, 1], 2, 11, 12), //  9
+    StageSpec([3, 2, 1, 2, 3], 2, 11, 12), // 10
+    StageSpec([3, 2, 1, 2, 3], 3, 12, 15), // 11  10과 같은 구성 · 속도만 상승
   ];
 
   /// 공 속도 단계표 — **초당 픽셀 실제값** (2026-09-03 변경).
@@ -533,6 +556,7 @@ class BrickState {
     ];
     _placeItems();
     clearEffects(); // 스테이지가 바뀌면 아이템 효과는 전부 초기화
+    paused = false; // 일시정지를 걸어 둔 채 스테이지가 넘어가는 일이 없게
     status = GameStatus.ready;
     stageIntro = true;
     _placeBallOnPaddle();
@@ -767,6 +791,15 @@ class BrickState {
   /// dt = 직전 프레임으로부터 흐른 시간(초).
   /// 프레임 수가 아니라 시간으로 움직여야 기기 성능에 따라 속도가 달라지지 않는다.
   void update(double dt) {
+    // 일시정지 — 게임 시간은 멈추고 깜빡임용 시계만 돈다 (2026-09-04).
+    //
+    // 주요 로직 : 상태(GameStatus)로 만들지 않고 별도 스위치로 두었다.
+    //   일시정지는 「게임이 어디까지 갔는가」가 아니라 **잠깐 멈춤**이라,
+    //   상태에 넣으면 풀 때 원래 상태로 되돌리는 코드가 따로 필요해진다.
+    if (paused) {
+      pauseElapsed += dt;
+      return;
+    }
     if (status != GameStatus.playing) return;
 
     _tickEffects(dt);

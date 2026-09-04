@@ -107,19 +107,27 @@ class BrickPainter extends CustomPainter {
     final flashIdx = state.invincibleColorIndex;
     final ballColor =
         flashIdx == null ? kBallColor : kInvincibleBallColors[flashIdx];
+    // 주요 로직 : ◉ 도 **바깥 지름이 ● 와 같다** (2026-09-04 수정).
+    //   처음에는 링을 공 밖에 둘렀더니 무적일 때만 공이 커 보였다.
+    //   공 크기는 조준 감각과 직결되므로, 링은 **공 안쪽을 파서** 만든다.
+    //   가운데 점(0.34) + 링(0.44~1.0) 사이의 빈틈이 ◉ 로 읽히게 한다.
     final ring = state.invincibleRingOn;
     for (final ball in state.balls) {
-      canvas.drawCircle(ball.pos, ball.radius, Paint()..color = ballColor);
-      if (ring) {
-        canvas.drawCircle(
-          ball.pos,
-          ball.radius * 1.7,
-          Paint()
-            ..color = ballColor
-            ..style = PaintingStyle.stroke
-            ..strokeWidth = ball.radius * 0.4,
-        );
+      final r = ball.radius;
+      final paint = Paint()..color = ballColor;
+      if (!ring) {
+        canvas.drawCircle(ball.pos, r, paint);
+        continue;
       }
+      canvas.drawCircle(ball.pos, r * 0.34, paint);
+      canvas.drawCircle(
+        ball.pos,
+        r * 0.72,
+        Paint()
+          ..color = ballColor
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = r * 0.56,
+      );
     }
   }
 

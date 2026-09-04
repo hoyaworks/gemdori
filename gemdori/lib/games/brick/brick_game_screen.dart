@@ -59,6 +59,7 @@ class _BrickGameScreenState extends State<BrickGameScreen>
   }
 
   void _movePaddle(Offset localPos) {
+    if (_state.paused) return; // 멈춘 동안에는 패들도 따라오지 않는다
     setState(() => _state.movePaddleTo(localPos.dx));
   }
 
@@ -67,6 +68,12 @@ class _BrickGameScreenState extends State<BrickGameScreen>
   /// 주요 로직 : 끝난 화면에서는 아무 반응도 하지 않는다.
   ///   화면 아무 곳이나 눌러 다시 시작되면 홈/다시시작 선택 버튼을 누를 새가 없다.
   void _primaryAction() {
+    // 일시정지 중이면 푸는 것이 먼저다 (2026-09-04).
+    // 여기서 걸러 내지 않으면 푸는 동작이 그대로 발사로 이어진다.
+    if (_state.paused) {
+      setState(_state.resume);
+      return;
+    }
     if (_state.status != GameStatus.ready) return;
     setState(_state.launch);
   }
@@ -109,6 +116,14 @@ class _BrickGameScreenState extends State<BrickGameScreen>
           ],
         ),
         actions: [
+          // 일시정지 — 멈춰 있는 동안에는 버튼 자체를 감춘다.
+          // 화면 아무 곳이나 눌러 푸는 방식이라, 버튼이 남아 있으면
+          // 「이 버튼을 다시 눌러야 하나」로 읽힌다.
+          if (!_state.paused && _state.canPause)
+            IconButton(
+              icon: const Icon(Icons.pause),
+              onPressed: () => setState(_state.pause),
+            ),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: () => setState(_state.restart),
@@ -200,6 +215,17 @@ class _BrickGameScreenState extends State<BrickGameScreen>
   ///   ready 이면서 첫 안내일 때만 STAGE n 을 띄우고,
   ///   놓친 뒤 다시 대기할 때는 아무것도 띄우지 않는다 — 조작법은 이미 익혔으므로.
   Widget _overlay() {
+    // 일시정지가 무엇보다 앞선다 — 멈춘 동안에는 이것만 보인다.
+    // 글자 모양은 GAME OVER · CLEARED 와 같은 _label() 을 쓰고,
+    // 깜빡임으로 「멈춰 있다」를 표현한다.
+    if (_state.paused) {
+      return Center(
+        child: Opacity(
+          opacity: _state.pauseBlinkOn ? 1 : 0.15,
+          child: _label('PAUSE'),
+        ),
+      );
+    }
     switch (_state.status) {
       case GameStatus.playing:
         return const SizedBox.shrink();
