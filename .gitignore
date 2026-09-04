@@ -1,0 +1,10 @@
+# 저장소 전체에 걸리는 것만 둔다.
+# Flutter 빌드 산출물·IDE 파일은 gemdori/.gitignore 가 담당한다.
+
+# OS
+Thumbs.db
+.DS_Store
+
+# 에디터
+.vscode/
+*.code-workspace
