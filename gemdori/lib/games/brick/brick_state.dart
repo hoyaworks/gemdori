@@ -17,6 +17,10 @@
 //    gameOver 목숨을 다 씀
 //    화면은 이 값 하나만 보고 무엇을 띄울지 정한다. 조건이 여기저기 흩어지지 않는다.
 //
+//  주요 로직 : 면에 부딪혔을 때의 「되꺾기」는 reflectJustCrossedFace() 하나로 통합돼 있다
+//    (2026-09-04). 좌우 벽·위 벽·벽돌이 같은 식을 쓴다. **막 넘어선 경우에만** 쓸 수 있고,
+//    이미 겹친 채 시작한 공에 쓰면 벽돌 위로 순간이동한다 — 함수 주석의 경고를 볼 것.
+//
 //  주요 로직 : update() 안의 판정 순서 — 순서가 곧 규칙이다
 //    1 좌우 벽  2 위 벽  3 벽돌  4 패들  5 바닥(놓침)
 //    벽돌을 패들보다 먼저 보는 이유 : 같은 프레임에 둘 다 닿는 일은 거의 없지만,
@@ -78,6 +82,35 @@ class StageSpec {
 
   /// 이 스테이지에 심는 방해 아이템 개수
   final int harmItems;
+}
+
+/// **이번 프레임에 막 넘어선** 면에서 되꺾은 좌표 (2026-09-04 통합)
+///
+/// 한 축만 본다. `from`(프레임 시작) → `to`(막 이동한 자리) 로 가는 길에 `face` 를
+/// 넘어섰을 때, 넘어간 만큼을 반대 방향으로 마저 보낸 좌표를 돌려준다.
+/// 좌우 벽·위 벽·벽돌이 저마다 똑같은 식을 적고 있어 한 자리로 모았다.
+///
+/// 주요 로직 : 면에 **붙여 놓기만 하면** 부딪힌 프레임만 이동거리가 짧아
+///   「멈칫 → 가속」으로 보인다. 넘어간 거리를 버리지 않고 접어 보내야
+///   프레임마다 가는 거리가 일정하다.
+///
+/// ⚠️ **이미 면을 넘어선 채로 시작한 좌표에는 쓰면 안 된다.**
+///   거울처럼 접는 계산이라 면에서 깊이 들어와 있을수록 반대편으로 그만큼 멀리 보낸다.
+///   2026-09-04 에 실제로 사고가 났다 — 벽돌과 벽돌 사이 틈에 낀 공(이미 깊이 겹친 상태)이
+///   충돌 뒤 **벽돌 위로 순간이동**했다. 그 경우는 되꺾지 말고 면에 붙여야 한다
+///   (`_moveBall` 의 `if (!hitSide && !hitFace)` 분기).
+///   전제가 깨진 채 부르면 테스트에서 바로 터지도록 assert 로 막아 둔다.
+double reflectJustCrossedFace({
+  required double from,
+  required double to,
+  required double face,
+}) {
+  assert(
+    (from - face) * (to - face) <= 0,
+    '되꺾기 전제 위반 — 이미 면을 넘어선 채 시작했다 '
+    '(from=$from, to=$to, face=$face). 이 경우는 면에 붙여서 처리할 것.',
+  );
+  return 2 * face - to;
 }
 
 class BrickState {
@@ -1010,20 +1043,33 @@ class BrickState {
     //          그 프레임만 3px, 다음 프레임부터 5px 를 가니 눈에는 「멈칫 → 가속」으로 보인다.
     //   대책 : 넘어간 만큼을 반사 방향으로 **마저 보낸다**(거울처럼 접기).
     //          이러면 프레임마다 가는 거리가 일정해진다.
+    //
+    // 2026-09-04 : 같은 식이 위 벽·벽돌에도 그대로 있어 reflectJustCrossedFace 로 모았다.
+    //   프레임 시작(from) x 는 이 함수 맨 끝에서 항상 경기장 안으로 가둬 두므로
+    //   여기 오는 공은 「이번 프레임에 막 넘어선」 경우뿐이다 — 되꺾기 전제가 성립한다.
     if (next.dx - r0 < 0) {
-      next = Offset(2 * r0 - next.dx, next.dy);
+      next = Offset(
+        reflectJustCrossedFace(from: from.dx, to: next.dx, face: r0),
+        next.dy,
+      );
       v = Offset(v.dx.abs(), v.dy);
       _emit(GameEventType.wallHit);
     } else if (next.dx + r0 > fieldSize.width) {
       final limit = fieldSize.width - r0;
-      next = Offset(2 * limit - next.dx, next.dy);
+      next = Offset(
+        reflectJustCrossedFace(from: from.dx, to: next.dx, face: limit),
+        next.dy,
+      );
       v = Offset(-v.dx.abs(), v.dy);
       _emit(GameEventType.wallHit);
     }
 
     // 2 위 벽
     if (next.dy - r0 < 0) {
-      next = Offset(next.dx, 2 * r0 - next.dy);
+      next = Offset(
+        next.dx,
+        reflectJustCrossedFace(from: from.dy, to: next.dy, face: r0),
+      );
       v = Offset(v.dx, v.dy.abs());
       _emit(GameEventType.wallHit);
     }
@@ -1094,13 +1140,24 @@ class BrickState {
 
       // 2026-09-03 : 벽과 같은 이유로 **파고든 만큼 되꺾어** 준다.
       //   면에 붙여 놓기만 하면 그 프레임만 덜 가서 「멈칫 → 가속」으로 보인다.
+      //
+      // 2026-09-04 : 벽과 똑같은 식이라 reflectJustCrossedFace 로 모았다.
+      //   여기까지 온 것은 hitSide 나 hitFace 가 참인 경우뿐이고, 그 둘은 각각
+      //   「직전 위치가 그 면의 완전히 바깥」이었음을 뜻한다 — 즉 이번 프레임에 막 넘어섰다.
+      //   이미 겹친 채 시작한 경우는 위 분기에서 이미 빠져나갔으므로 전제가 성립한다.
       if (reflectX) {
         final face = v.dx > 0 ? r.left - r0 : r.right + r0;
-        next = Offset(2 * face - next.dx, next.dy);
+        next = Offset(
+          reflectJustCrossedFace(from: from.dx, to: next.dx, face: face),
+          next.dy,
+        );
         v = Offset(-v.dx, v.dy);
       } else {
         final face = v.dy > 0 ? r.top - r0 : r.bottom + r0;
-        next = Offset(next.dx, 2 * face - next.dy);
+        next = Offset(
+          next.dx,
+          reflectJustCrossedFace(from: from.dy, to: next.dy, face: face),
+        );
         v = Offset(v.dx, -v.dy);
       }
       break;

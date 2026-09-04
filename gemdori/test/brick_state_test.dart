@@ -7,6 +7,7 @@
 //
 //  상세 설명 — 테스트 묶음
 //    ballTests()          공 이동과 벽 반사
+//    reflectFaceTests()   되꺾기 계산 자체 (좌우 벽·위 벽·벽돌이 함께 쓰는 식)
 //    paddleTests()        패들 이동 · 반사각
 //    paddleTunnelTests()  빠른 공이 패들을 뚫지 않는가 (2026-09-02 실제로 났던 문제)
 //    brickTests()         벽돌 배치 · 내구도 · 충돌 · 점수
@@ -44,6 +45,7 @@ BrickState playing({
 
 void main() {
   ballTests();
+  reflectFaceTests();
   paddleTests();
   paddleTunnelTests();
   brickTests();
@@ -112,6 +114,50 @@ void ballTests() {
       s.update(0.5);
       expect(s.ballVelocity.distance,
           closeTo(const Offset(-100, 60).distance, 0.001));
+    });
+  });
+}
+
+/// 되꺾기 계산 자체를 본다 (2026-09-04)
+///
+/// 좌우 벽·위 벽·벽돌이 저마다 적고 있던 같은 식을 reflectJustCrossedFace 로 모았다.
+/// 세 곳이 한 함수를 쓰므로 여기가 깨지면 세 곳이 동시에 깨진다 — 그래서 따로 둔다.
+void reflectFaceTests() {
+  group('되꺾기', () {
+    // 되꺾기를 쓰는 이유가 곧 이 성질이다 — 부딪힌 프레임만 덜 가면
+    // 화면에서 「멈칫 → 가속」으로 보인다. 거리가 새면 그 증상이 돌아온다.
+    test('면까지 간 거리 + 되꺾여 간 거리 = 한 프레임 거리', () {
+      const from = 10.0;
+      const to = -40.0; // 한 프레임에 50 을 갔다
+      const face = 8.0;
+      final folded = reflectJustCrossedFace(from: from, to: to, face: face);
+      final toFace = (face - from).abs();
+      final after = (folded - face).abs();
+      expect(toFace + after, closeTo((to - from).abs(), 1e-9));
+    });
+
+    test('반대 방향에서 넘어와도 거리가 그대로다', () {
+      const from = 390.0;
+      const to = 440.0;
+      const face = 392.0;
+      final folded = reflectJustCrossedFace(from: from, to: to, face: face);
+      expect((face - from).abs() + (folded - face).abs(),
+          closeTo((to - from).abs(), 1e-9));
+      expect(folded, lessThan(face), reason: '되꺾였으니 면의 반대쪽에 선다');
+    });
+
+    test('면에 딱 멈추면 그 자리 그대로다', () {
+      expect(reflectJustCrossedFace(from: 10, to: 8, face: 8), 8);
+    });
+
+    // 2026-09-04 : 이 전제가 깨져서 실제로 사고가 났다 —
+    //   벽돌 틈에 낀(이미 깊이 넘어선) 공이 벽돌 위로 순간이동했다.
+    //   그 경우는 되꺾지 말고 면에 붙여야 하므로, 잘못 부르면 여기서 바로 터뜨린다.
+    test('이미 면을 넘어선 채 시작하면 터진다', () {
+      expect(
+        () => reflectJustCrossedFace(from: 4, to: 2, face: 8),
+        throwsA(isA<AssertionError>()),
+      );
     });
   });
 }
