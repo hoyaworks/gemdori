@@ -201,10 +201,47 @@ class BrickState {
   ///   대충 하면 : 여기에 필드를 하나 더 두면 초기화 자리를 빠뜨려
   ///   무적이 끝난 뒤에도 색이 남는다.
   int? get invincibleColorIndex {
+    final e = _invincibleElapsed;
+    return e == null ? null : (e / ballFlashPeriod).floor() % 3;
+  }
+
+  /// 무적이 걸린 뒤 흐른 시간(초). 무적이 아니면 null
+  double? get _invincibleElapsed {
     final left = effects[ItemType.invincibleBall];
     if (left == null) return null;
-    final elapsed = ItemType.invincibleBall.seconds - left;
-    return (elapsed / ballFlashPeriod).floor() % 3;
+    return ItemType.invincibleBall.seconds - left;
+  }
+
+  /// 무적 중 공에 바깥 링을 두를 차례인가 — ● ↔ ◉ 를 오간다 (2026-09-04).
+  ///
+  /// 주요 로직 : 모양 주기는 색 주기의 **두 배**로 둔다.
+  ///   색과 같은 속도로 바꾸면 초당 6~7번 형태가 흔들려 공을 눈으로 좇기 어렵다.
+  bool get invincibleRingOn {
+    final e = _invincibleElapsed;
+    if (e == null) return false;
+    return (e / (ballFlashPeriod * 2)).floor().isOdd;
+  }
+
+  /// 상단 표시줄에 올릴 효과 — **버프만, 번호순 고정** (2026-09-04).
+  ///
+  /// 주요 로직 : 규칙을 여기에 둔 이유가 있다.
+  ///   예전에는 화면이 `effects` 를 통째로 뿌려서 장비(멀티공·패들 크기)까지 올라갔고,
+  ///   **규칙이 코드 어디에도 없어** 문서와 조용히 어긋나 있었다.
+  ///   나열 순서도 `effects` 의 삽입 순서(=먹은 순서)라 자리가 매번 바뀌었다.
+  List<ItemType> get hudEffects =>
+      ItemType.values.where((t) => t.isBuff && effects.containsKey(t)).toList();
+
+  /// 효과가 풀리기 전 예고로 깜빡일 시간(초)
+  static const double effectWarnSeconds = 2;
+
+  /// 상단 기호를 지금 켜 둘 것인가 — 만료 2초 전부터 깜빡인다 (2026-09-04).
+  ///
+  /// 주요 로직 : 속도 표시에만 있던 예고를 버프 전체로 넓힌 것이다.
+  ///   무적 6초가 언제 끝나는지 알 수 없어, **끝난 줄 모르고 벽돌에 처박는** 일이 있었다.
+  bool effectBlinkOn(ItemType t) {
+    final left = effects[t];
+    if (left == null || left > effectWarnSeconds) return true;
+    return left % speedBlinkPeriod > speedBlinkPeriod / 2;
   }
 
   /// 떨어지고 있는 아이템들

@@ -96,11 +96,15 @@ class _BrickGameScreenState extends State<BrickGameScreen>
             const SizedBox(width: 16),
             _speedLabel(),
             const SizedBox(width: 16),
-            // 걸려 있는 효과 — 도움은 원, 방해는 네모로 간단히
-            for (final t in _state.effects.keys)
+            // 걸려 있는 효과 — **버프만** 올린다 (장비·즉발은 화면이 이미 보여준다).
+            // 목록·순서 판단은 BrickState.hudEffects 가 하고, 여기서는 그리기만.
+            for (final t in _state.hudEffects)
               Padding(
                 padding: const EdgeInsets.only(right: 6),
-                child: ItemMark(t),
+                child: Opacity(
+                  opacity: _state.effectBlinkOn(t) ? 1 : 0.25,
+                  child: ItemMark(t),
+                ),
               ),
           ],
         ),

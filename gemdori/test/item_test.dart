@@ -498,6 +498,86 @@ void main() {
       s.clearEffects();
       expect(s.invincibleColorIndex, isNull);
     });
+
+    // 모양 교대 — 색보다 두 배 느리게 (2026-09-04)
+    test('링은 색보다 두 배 느리게 켜졌다 꺼진다', () {
+      final s = make(stage: 1);
+      s.applyItem(ItemType.invincibleBall);
+      final total = ItemType.invincibleBall.seconds;
+      const p = BrickState.ballFlashPeriod;
+
+      expect(s.invincibleRingOn, isFalse, reason: '처음엔 그냥 원');
+      s.effects[ItemType.invincibleBall] = total - p * 2.5;
+      expect(s.invincibleRingOn, isTrue);
+      s.effects[ItemType.invincibleBall] = total - p * 4.5;
+      expect(s.invincibleRingOn, isFalse, reason: '다시 원으로');
+    });
+
+    test('무적이 아니면 링도 없다', () {
+      expect(make(stage: 1).invincibleRingOn, isFalse);
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════
+  //  상단 표시줄 — 버프만, 번호순 (2026-09-04)
+  // ═══════════════════════════════════════════════════════════════
+  group('상단 표시 대상', () {
+    test('갈래가 8종 전부에 정해져 있다', () {
+      final buff = ItemType.values.where((t) => t.cls == ItemClass.buff);
+      final gear = ItemType.values.where((t) => t.cls == ItemClass.gear);
+      final con = ItemType.values.where((t) => t.cls == ItemClass.consumable);
+      expect(buff.length, 4, reason: '무적·감속·반전·증속');
+      expect(gear.length, 3, reason: '멀티공·패들 확대·축소');
+      expect(con.length, 1, reason: '벽돌 부활');
+    });
+
+    test('장비는 걸려 있어도 상단에 안 올라간다', () {
+      final s = make(stage: 1);
+      s.applyItem(ItemType.multiBall);
+      s.applyItem(ItemType.paddleGrow);
+      expect(s.hasEffect(ItemType.multiBall), isTrue, reason: '효과 자체는 걸려 있다');
+      expect(s.hudEffects, isEmpty, reason: '화면이 이미 보여주므로 상단엔 없다');
+    });
+
+    test('버프만 올라간다', () {
+      final s = make(stage: 1);
+      s.applyItem(ItemType.multiBall);
+      s.applyItem(ItemType.reverse);
+      s.applyItem(ItemType.invincibleBall);
+      expect(s.hudEffects, [ItemType.invincibleBall, ItemType.reverse],
+          reason: '먹은 순서가 아니라 번호순으로 고정');
+    });
+
+    test('속도는 상단에 안 올라간다 — SPEED 표시가 대신한다', () {
+      final s = make(stage: 1);
+      s.applyItem(ItemType.fastBall);
+      expect(s.hudEffects, isEmpty);
+    });
+  });
+
+  // 만료 2초 전 예고 — 속도에만 있던 것을 버프 전체로 (2026-09-04)
+  group('버프 만료 예고', () {
+    test('2초보다 많이 남았으면 계속 켜져 있다', () {
+      final s = make(stage: 1);
+      s.applyItem(ItemType.invincibleBall); // 6초
+      expect(s.effectBlinkOn(ItemType.invincibleBall), isTrue);
+      s.effects[ItemType.invincibleBall] = 2.5;
+      expect(s.effectBlinkOn(ItemType.invincibleBall), isTrue);
+    });
+
+    test('2초 안으로 들어오면 깜빡인다', () {
+      final s = make(stage: 1);
+      s.applyItem(ItemType.invincibleBall);
+      const p = BrickState.speedBlinkPeriod;
+      s.effects[ItemType.invincibleBall] = p * 0.8; // 주기 앞쪽 = 켜짐
+      expect(s.effectBlinkOn(ItemType.invincibleBall), isTrue);
+      s.effects[ItemType.invincibleBall] = p * 0.2; // 주기 뒤쪽 = 꺼짐
+      expect(s.effectBlinkOn(ItemType.invincibleBall), isFalse);
+    });
+
+    test('안 걸린 효과는 깜빡임 대상이 아니다', () {
+      expect(make(stage: 1).effectBlinkOn(ItemType.reverse), isTrue);
+    });
   });
 }
 

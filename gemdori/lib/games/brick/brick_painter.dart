@@ -103,12 +103,23 @@ class BrickPainter extends CustomPainter {
       Paint()..color = const Color(0xFFE3E9F0),
     );
 
-    // 무적 중에는 공이 빨강 계열 3색을 돌며 번쩍인다.
+    // 무적 중에는 공이 빨강 계열 3색을 돌며 번쩍이고, ● ↔ ◉ 로 모양도 오간다.
     final flashIdx = state.invincibleColorIndex;
     final ballColor =
         flashIdx == null ? kBallColor : kInvincibleBallColors[flashIdx];
+    final ring = state.invincibleRingOn;
     for (final ball in state.balls) {
       canvas.drawCircle(ball.pos, ball.radius, Paint()..color = ballColor);
+      if (ring) {
+        canvas.drawCircle(
+          ball.pos,
+          ball.radius * 1.7,
+          Paint()
+            ..color = ballColor
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = ball.radius * 0.4,
+        );
+      }
     }
   }
 

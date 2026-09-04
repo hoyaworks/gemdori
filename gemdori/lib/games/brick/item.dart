@@ -31,29 +31,61 @@ enum ItemKind { help, harm }
 /// 지속 방식
 enum ItemDuration { instant, timed, untilLost }
 
+/// 성질 — **상단 표시줄에 올릴지를 이것 하나로 가른다** (2026-09-04)
+///
+/// 주요 로직 : 가르는 기준은 「연출이 있느냐」가 아니라
+///   **「효과가 화면 구조로 드러나느냐」** 다.
+///     공이 3개인 것 · 패들이 넓은 것 = **구조** → 화면이 이미 답을 보여준다
+///     공이 붉게 번쩍이는 것          = **연출** → 걸린 줄은 알아도 무엇이 얼마나인지는 모른다
+///   그래서 상단에는 **buff 만** 올린다. 좌우 반전처럼 조작해 봐야 아는 것이
+///   이 규칙이 필요한 대표 사례다.
+///
+///   대충 하면 : 화면이 걸린 효과를 전부 뿌리게 되고(예전 코드가 그랬다),
+///   규칙이 코드 어디에도 남지 않아 문서와 조용히 어긋난다.
+enum ItemClass {
+  /// 상태 — 화면만 봐서는 걸린 줄 모른다. **상단에 올린다**
+  buff,
+
+  /// 장비 — 착용 결과가 화면에 그대로 보인다. 상단에 안 올린다
+  gear,
+
+  /// 소모·즉발 — 남을 것이 없다. 결과는 벽돌로 보인다
+  consumable,
+}
+
 /// 나열 순서 = 화면 표시 번호(1~8)이자 샘플 스테이지에 심는 순서다.
+/// **상단 표시 순서도 이 순서를 따른다** — 먹은 순서로 두면 자리가 뒤바뀐다.
 enum ItemType {
   // ── 도움 (푸른색·초록 계열) ──
-  invincibleBall(ItemKind.help, ItemDuration.timed, seconds: 6), // 1 ●
-  multiBall(ItemKind.help, ItemDuration.untilLost), //              2 ◎
-  slowBall(ItemKind.help, ItemDuration.timed, seconds: 10), //      3 ▼
-  paddleGrow(ItemKind.help, ItemDuration.untilLost), //             4 ◀ ▶
+  invincibleBall(ItemKind.help, ItemDuration.timed, ItemClass.buff, seconds: 6), // 1 ◉
+  multiBall(ItemKind.help, ItemDuration.untilLost, ItemClass.gear), //              2 ◎
+  slowBall(ItemKind.help, ItemDuration.timed, ItemClass.buff, seconds: 10), //      3 ▼
+  paddleGrow(ItemKind.help, ItemDuration.untilLost, ItemClass.gear), //             4 ◀ ▶
 
   // ── 방해 (경고색 계열) ──
-  brickRevive(ItemKind.harm, ItemDuration.instant), //              5 ■ ■
-  reverse(ItemKind.harm, ItemDuration.timed, seconds: 4), //        6 ◐
-  paddleShrink(ItemKind.harm, ItemDuration.untilLost), //           7 ▶ ◀
-  fastBall(ItemKind.harm, ItemDuration.timed, seconds: 10); //      8 ▲
+  brickRevive(ItemKind.harm, ItemDuration.instant, ItemClass.consumable), //        5 ■ ■
+  reverse(ItemKind.harm, ItemDuration.timed, ItemClass.buff, seconds: 4), //        6 ◐
+  paddleShrink(ItemKind.harm, ItemDuration.untilLost, ItemClass.gear), //           7 ▶ ◀
+  fastBall(ItemKind.harm, ItemDuration.timed, ItemClass.buff, seconds: 10); //      8 ▲
 
-  const ItemType(this.kind, this.duration, {this.seconds = 0});
+  const ItemType(this.kind, this.duration, this.cls, {this.seconds = 0});
 
   final ItemKind kind;
   final ItemDuration duration;
+
+  /// 상단에 올릴지를 가르는 성질
+  final ItemClass cls;
 
   /// 시간형일 때의 지속 시간(초)
   final double seconds;
 
   bool get isHelp => kind == ItemKind.help;
+
+  /// 상단 표시줄 대상인가.
+  ///
+  /// 상세 설명 : 속도(▼▲)도 buff 지만 `effects` 에 들어가지 않는다.
+  ///   `SPEED (▲▲)` 표시가 절대 단계를 보여주므로 기호보다 정보가 많다.
+  bool get isBuff => cls == ItemClass.buff;
 
   /// 서로 지우는 짝. 없으면 null
   ItemType? get opposite => switch (this) {
