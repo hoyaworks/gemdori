@@ -23,12 +23,16 @@ import 'package:flutter/material.dart';
 import 'brick_state.dart';
 import 'item.dart';
 
+// 벽돌 색 원본 — **여기 한 곳에서만 정한다** (2026-09-04).
+//   내구도가 값이고 색은 따라오는 표현이다. 색을 바꿔도 내구도는 그대로다.
+//   생성 아이템 색도 이 상수를 그대로 쓴다 — 값을 두 번 적으면
+//   한쪽만 고쳤을 때 「녹색 아이템을 먹었는데 파란 벽돌이 생기는」 상태가 된다.
+const Color _hp1 = Color(0xFF6FC3FF); // 1번 맞으면 깨짐
+const Color _hp2 = Color(0xFFFFD86B); // 2번
+const Color _hp3 = Color(0xFFFF6B6B); // 3번
+
 /// 남은 내구도별 벽돌 색
-const Map<int, Color> kBrickColors = {
-  3: Color(0xFFFF6B6B), // red   — 3번 맞아야 깨짐
-  2: Color(0xFFFFD86B), // yellow — 2번
-  1: Color(0xFF6FC3FF), // blue  — 1번
-};
+const Map<int, Color> kBrickColors = {1: _hp1, 2: _hp2, 3: _hp3};
 
 /// 아이템 종류별 색 — 도움은 푸른색·초록 계열, 방해는 경고색 계열
 const Map<ItemType, Color> kItemColors = {
@@ -36,10 +40,10 @@ const Map<ItemType, Color> kItemColors = {
   ItemType.multiBall: Color(0xFFC08BFF), //      2 ◎ 보라 (생성 파랑과 겹쳐 2026-09-04 이동)
   ItemType.slowBall: Color(0xFF7BE38B), //       3 ▼ 초록
   ItemType.paddleGrow: Color(0xFF4FD1A5), //     4 ◀▶ 청녹
-  // 생성 3종 — **벽돌 색을 그대로 쓴다.** 색이 곧 「무엇이 생기는가」다
-  ItemType.brickSpawnBlue: Color(0xFF6FC3FF), //   5 ■■
-  ItemType.brickSpawnYellow: Color(0xFFFFD86B), // 6 ■■
-  ItemType.brickSpawnRed: Color(0xFFFF6B6B), //    7 ■■
+  // 생성 3종 — **벽돌 색 상수를 그대로 참조한다.** 색이 곧 「무엇이 생기는가」다
+  ItemType.brickSpawnHp1: _hp1, //   5 ■■
+  ItemType.brickSpawnHp2: _hp2, //   6 ■■
+  ItemType.brickSpawnHp3: _hp3, //   7 ■■
   ItemType.reverse: Color(0xFFFF7BAC), //        8 ◐ 자홍
   ItemType.paddleShrink: Color(0xFFFF8A3D), //   9 ▶◀ 주황빨강
   ItemType.fastBall: Color(0xFFFF4D4D), //      10 ▲ 빨강
@@ -189,9 +193,9 @@ void drawItemMark(Canvas canvas, Offset c, ItemType type, double s) {
     case ItemType.paddleShrink: // ▶ ◀ (안쪽)
       _sideTriangle(canvas, c.translate(-s * 0.75, 0), s * 0.8, paint, left: false);
       _sideTriangle(canvas, c.translate(s * 0.75, 0), s * 0.8, paint, left: true);
-    case ItemType.brickSpawnBlue: // ■ ■
-    case ItemType.brickSpawnYellow:
-    case ItemType.brickSpawnRed:
+    case ItemType.brickSpawnHp1: // ■ ■
+    case ItemType.brickSpawnHp2:
+    case ItemType.brickSpawnHp3:
       final w = s * 0.7;
       canvas.drawRect(
         Rect.fromCenter(center: c.translate(-s * 0.6, 0), width: w, height: w),

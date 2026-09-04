@@ -14,6 +14,7 @@ import 'dart:math';
 import 'dart:ui';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:gemdori/games/brick/brick_painter.dart';
 import 'package:gemdori/games/brick/brick_state.dart';
 import 'package:gemdori/games/brick/item.dart';
 
@@ -26,6 +27,7 @@ BrickState make({int stage = 1}) => BrickState(
 void main() {
   paddleClampTests();
   multiBallRefillTests();
+  brickHpColorTests();
   group('아이템 정의', () {
     test('도움 4종 · 방해 6종 (생성 3색 포함)', () {
       final help = ItemType.values.where((t) => t.isHelp).length;
@@ -47,7 +49,7 @@ void main() {
       final instant =
           ItemType.values.where((t) => t.duration == ItemDuration.instant);
       expect(instant.map((t) => t.spawnHp), [1, 2, 3]);
-      expect(ItemType.brickSpawnBlue.duration, ItemDuration.instant);
+      expect(ItemType.brickSpawnHp1.duration, ItemDuration.instant);
       expect(ItemType.paddleGrow.duration, ItemDuration.untilLost);
       expect(ItemType.multiBall.duration, ItemDuration.untilLost);
       expect(ItemType.reverse.duration, ItemDuration.timed);
@@ -276,8 +278,8 @@ void main() {
     test('2초가 지나면 사라진다', () {
       final s = make(stage: 1);
       s.status = GameStatus.playing;
-      s.applyItem(ItemType.brickSpawnBlue);
-      expect(s.flashItem, ItemType.brickSpawnBlue);
+      s.applyItem(ItemType.brickSpawnHp1);
+      expect(s.flashItem, ItemType.brickSpawnHp1);
 
       for (var i = 0; i < 3 * 60; i++) {
         s.update(1 / 60);
@@ -393,7 +395,7 @@ void main() {
       for (final b in s.bricks.where((b) => b.row == row)) {
         b.hp = 0;
       }
-      s.applyItem(ItemType.brickSpawnBlue);
+      s.applyItem(ItemType.brickSpawnHp1);
 
       final made = s.bricks.where((b) => b.row == row).toList();
       expect(made.every((b) => b.alive), isTrue, reason: '새로 생겼다');
@@ -408,7 +410,7 @@ void main() {
       }
       expect(s.remainingBricks, s.bricks.length - s.brickCols);
 
-      s.applyItem(ItemType.brickSpawnBlue);
+      s.applyItem(ItemType.brickSpawnHp1);
 
       expect(s.remainingBricks, s.bricks.length);
       expect(s.effects, isEmpty, reason: '즉발형이라 효과로 남지 않는다');
@@ -423,7 +425,7 @@ void main() {
       for (final b in s.bricks.where((b) => b.row == row)) {
         b.hp = 0;
       }
-      s.applyItem(ItemType.brickSpawnBlue);
+      s.applyItem(ItemType.brickSpawnHp1);
       expect(s.bricks.where((b) => b.row == row).every((b) => b.hp == 1), isTrue,
           reason: '파랑 아이템을 먹었으니 파란 줄로 생긴다');
     });
@@ -435,7 +437,7 @@ void main() {
       for (final b in line.take(3)) {
         b.hp = 0;
       }
-      s.applyItem(ItemType.brickSpawnYellow);
+      s.applyItem(ItemType.brickSpawnHp2);
 
       expect(line.take(3).every((b) => b.hp == 2), isTrue, reason: '빈 자리만 노랑');
       expect(line.skip(3).every((b) => b.hp == 3), isTrue,
@@ -443,8 +445,8 @@ void main() {
     });
 
     test('스테이지별로 나올 수 있는 색이 다르다', () {
-      expect(BrickState.spawnColorsFor(1), [ItemType.brickSpawnBlue]);
-      expect(BrickState.spawnColorsFor(5), [ItemType.brickSpawnBlue]);
+      expect(BrickState.spawnColorsFor(1), [ItemType.brickSpawnHp1]);
+      expect(BrickState.spawnColorsFor(5), [ItemType.brickSpawnHp1]);
       expect(BrickState.spawnColorsFor(6).length, 2);
       expect(BrickState.spawnColorsFor(8).length, 2);
       expect(BrickState.spawnColorsFor(9).length, 3);
@@ -755,6 +757,47 @@ void multiBallRefillTests() {
       s.applyItem(ItemType.multiBall);
       s.applyItem(ItemType.multiBall);
       expect(s.balls.length, 3);
+    });
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  내구도와 색 (2026-09-04)
+// ═══════════════════════════════════════════════════════════════════
+//
+//  주요 로직 : **내구도가 값이고 색은 따라오는 표현**이다.
+//    색을 바꿔도 내구도는 그대로여야 하고, 색 값은 한 곳에만 있어야 한다.
+//    사람이 기억해서 지키는 대신 여기서 못박는다.
+void brickHpColorTests() {
+  group('내구도와 색', () {
+    test('색 개수와 최대 내구도가 어긋나지 않는다', () {
+      expect(kBrickColors.length, BrickState.maxBrickHp);
+      for (var hp = 1; hp <= BrickState.maxBrickHp; hp++) {
+        expect(kBrickColors[hp], isNotNull, reason: '내구도 $hp 의 색이 없다');
+      }
+    });
+
+    test('생성 아이템은 내구도 1~최대까지 하나씩 있다', () {
+      final hps = ItemType.values
+          .where((t) => t.isBrickSpawn)
+          .map((t) => t.spawnHp)
+          .toList()
+        ..sort();
+      expect(hps, [for (var i = 1; i <= BrickState.maxBrickHp; i++) i]);
+    });
+
+    test('생성 아이템 색 = 그 내구도의 벽돌 색', () {
+      for (final t in ItemType.values.where((t) => t.isBrickSpawn)) {
+        expect(kItemColors[t], kBrickColors[t.spawnHp], reason: '$t');
+      }
+    });
+
+    test('벽돌은 색을 따로 들고 있지 않다 — 내구도만 바꾸면 색도 따라온다', () {
+      final s = make(stage: 3);
+      final b = s.bricks.firstWhere((b) => b.hp == 3);
+      expect(kBrickColors[b.hp], kBrickColors[3]);
+      b.hp = 1;
+      expect(kBrickColors[b.hp], kBrickColors[1], reason: '내구도만 바꿔도 색이 따라온다');
     });
   });
 }

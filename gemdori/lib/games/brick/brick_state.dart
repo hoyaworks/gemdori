@@ -392,6 +392,13 @@ class BrickState {
   ///
   /// 주요 로직 : 아이템은 이 표 **안에서 한 단계씩** 움직인다(예전엔 스테이지 기준 ±1).
   ///   최고·최저에 닿으면 더 안 움직이고 지속 시간만 다시 찬다.
+  /// 벽돌의 최대 내구도. **색 개수와 같아야 한다** (테스트가 지킨다).
+  ///
+  /// 주요 로직 : 예전에는 이 값이 어디에도 적혀 있지 않고
+  ///   `(hp - 1) / 2` 의 **2 안에 숨어** 있었다. 내구도 4짜리 벽돌이 생기면
+  ///   오류 없이 가중치만 조용히 틀어진다 — 가장 찾기 어려운 형태의 고장이다.
+  static const int maxBrickHp = 3;
+
   static const List<int> speedTable = [250, 300, 390, 480, 570, 670, 780];
 
   /// 속도 단계를 나타내는 기호 — 상단에 `SPEED ▲2` 처럼 상시 표시한다.
@@ -542,14 +549,14 @@ class BrickState {
   ///     6~8   파랑 + 노랑
   ///     9~11  파랑 + 노랑 + 빨강
   static List<ItemType> spawnColorsFor(int stage) {
-    if (stage <= 5) return const [ItemType.brickSpawnBlue];
+    if (stage <= 5) return const [ItemType.brickSpawnHp1];
     if (stage <= 8) {
-      return const [ItemType.brickSpawnBlue, ItemType.brickSpawnYellow];
+      return const [ItemType.brickSpawnHp1, ItemType.brickSpawnHp2];
     }
     return const [
-      ItemType.brickSpawnBlue,
-      ItemType.brickSpawnYellow,
-      ItemType.brickSpawnRed,
+      ItemType.brickSpawnHp1,
+      ItemType.brickSpawnHp2,
+      ItemType.brickSpawnHp3,
     ];
   }
 
@@ -692,7 +699,7 @@ class BrickState {
     //   슬롯이 뽑히면 그때 스테이지가 허용하는 색 중에서 고른다.
     final harm = [
       ...ItemType.values.where((t) => !t.isHelp && !t.isBrickSpawn),
-      ItemType.brickSpawnBlue, // 생성 대표 슬롯
+      ItemType.brickSpawnHp1, // 생성 대표 슬롯
     ];
     final spawnColors = spawnColorsFor(stage);
     final free = [...bricks];
@@ -700,7 +707,8 @@ class BrickState {
     void place(int count, List<ItemType> pool, bool wantTough) {
       for (var i = 0; i < count && free.isNotEmpty; i++) {
         final weights = free.map((b) {
-          final tough = (b.hp - 1) / 2; // 0(파랑) ~ 1(빨강)
+          // 0(가장 무른 벽돌) ~ 1(가장 단단한 벽돌)
+          final tough = (b.hp - 1) / (maxBrickHp - 1);
           final bias = wantTough ? tough : 1 - tough;
           return 1 + progress * bias * 3;
         }).toList();

@@ -63,12 +63,14 @@ enum ItemType {
   paddleGrow(ItemKind.help, ItemDuration.untilLost, ItemClass.gear), //             4 ◀ ▶
 
   // ── 방해 ──
-  //   벽돌 생성 3종 — **색이 곧 생기는 벽돌의 색**이다 (2026-09-04)
-  brickSpawnBlue(ItemKind.harm, ItemDuration.instant, ItemClass.consumable,
+  //   벽돌 생성 3종 — 이름은 **내구도 기준**이다 (2026-09-04).
+  //   색은 내구도에서 따라오는 표현일 뿐이라, 이름에 색을 박으면
+  //   나중에 색을 바꿨을 때 이름이 거짓말이 된다.
+  brickSpawnHp1(ItemKind.harm, ItemDuration.instant, ItemClass.consumable,
       spawnHp: 1), //                                                             5 ■■ 파랑
-  brickSpawnYellow(ItemKind.harm, ItemDuration.instant, ItemClass.consumable,
+  brickSpawnHp2(ItemKind.harm, ItemDuration.instant, ItemClass.consumable,
       spawnHp: 2), //                                                             6 ■■ 노랑
-  brickSpawnRed(ItemKind.harm, ItemDuration.instant, ItemClass.consumable,
+  brickSpawnHp3(ItemKind.harm, ItemDuration.instant, ItemClass.consumable,
       spawnHp: 3), //                                                             7 ■■ 빨강
   reverse(ItemKind.harm, ItemDuration.timed, ItemClass.buff, seconds: 4), //        8 ◐
   paddleShrink(ItemKind.harm, ItemDuration.untilLost, ItemClass.gear), //           9 ▶ ◀
