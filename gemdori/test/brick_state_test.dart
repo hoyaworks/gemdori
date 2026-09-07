@@ -1112,12 +1112,27 @@ void fieldAspectTests() {
       }
     });
 
-    test('넓적한 화면은 높이를, 좁고 긴 화면은 폭을 꽉 채운다', () {
-      final wide = BrickState.fitField(const Size(1000, 600));
-      expect(wide.height, 600, reason: '높이 기준으로 맞춘다');
+    test('상한 안에서는 넓적한 화면이 높이를, 좁고 긴 화면이 폭을 채운다', () {
+      final wide = BrickState.fitField(const Size(1000, 400));
+      expect(wide.height, 400, reason: '높이 기준으로 맞춘다');
 
-      final tall = BrickState.fitField(const Size(400, 2000));
-      expect(tall.width, 400, reason: '폭 기준으로 맞춘다');
+      final tall = BrickState.fitField(const Size(300, 2000));
+      expect(tall.width, 300, reason: '폭 기준으로 맞춘다');
+    });
+
+    // 2026-09-07 — 1366×768 노트북에서 여유 있게 들어가는 크기가 상한이다
+    test('아무리 화면이 커도 상한을 넘지 않는다', () {
+      for (final c in [const Size(2560, 1440), const Size(1920, 1080)]) {
+        final f = BrickState.fitField(c);
+        expect(f.height, BrickState.maxFieldHeight, reason: '$c');
+        expect(f.width, closeTo(BrickState.maxFieldWidth, 0.0001));
+      }
+    });
+
+    test('상한에 걸린 뒤에는 창을 넓혀도 크기가 그대로다', () {
+      final a = BrickState.fitField(const Size(1400, 900));
+      final b = BrickState.fitField(const Size(2000, 900));
+      expect(a, b, reason: 'PC 에서 창을 움직여도 흔들리지 않는다');
     });
 
     test('빈 공간이 오면 0 을 준다', () {

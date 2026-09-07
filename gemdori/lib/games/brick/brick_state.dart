@@ -338,7 +338,19 @@ class BrickState {
   ///   위아래 여백이 남더라도 폭을 넓히는 쪽이 낫다는 판단.
   static const double fieldAspect = 3 / 4;
 
-  /// 주어진 공간 안에서 9:16 을 지키는 가장 큰 경기장 크기.
+  /// 경기장 세로 상한(px) — **아무리 화면이 커도 이보다 커지지 않는다** (2026-09-07).
+  ///
+  /// 주요 로직 : 1366×768 노트북에서 **여유 있게 들어가는 크기**로 잡았다.
+  ///   768 − 작업표시줄 48 − 브라우저 상단 100 − 앱 상단바 56 − 치트바 40 − 여백 12 ≈ 512.
+  ///   거기서 조금 더 덜어 500 으로 둔다.
+  ///   상한이 없으면 큰 모니터에서 과하게 커져, 폰에서는 손가락 이동 거리가 늘고
+  ///   PC 에서는 창을 움직일 때마다 크기가 따라 변한다.
+  static const double maxFieldHeight = 500;
+
+  /// 그때의 가로 상한 — 비율에서 저절로 나온다
+  static double get maxFieldWidth => maxFieldHeight * fieldAspect;
+
+  /// 주어진 공간 안에서 비율을 지키는 가장 큰 경기장 크기 (상한 적용).
   ///
   /// 주요 로직 : **화면 비율이 난이도가 되는 문제**를 막는다.
   ///   위아래로 길수록 공이 오가는 시간이 늘어 쉬워지고, 넓적하면 어려워진다.
@@ -346,10 +358,18 @@ class BrickState {
   ///   남는 공간은 배경색으로 비운다 — 늘리는 쪽은 전부 난이도를 건드린다.
   static Size fitField(Size available) {
     if (available.width <= 0 || available.height <= 0) return Size.zero;
-    final w = available.height * fieldAspect;
-    return w <= available.width
-        ? Size(w, available.height)
-        : Size(available.width, available.width / fieldAspect);
+
+    var h = available.height;
+    var w = h * fieldAspect;
+    if (w > available.width) {
+      w = available.width;
+      h = w / fieldAspect;
+    }
+    if (h > maxFieldHeight) {
+      h = maxFieldHeight;
+      w = maxFieldWidth;
+    }
+    return Size(w, h);
   }
 
   /// 아직 화면이 가져가지 않은 사건들.
