@@ -56,6 +56,9 @@ class _BrickGameScreenState extends State<BrickGameScreen>
   ///   여기서 한 번 받아 두 곳에 나눠 준다.
   final EventLog _log = EventLog();
 
+  /// 경기장 크기 단계 (치트). 기본은 상한 그대로라 **평소 동작과 같다**
+  FieldPreset _preset = FieldPreset.large;
+
   @override
   void initState() {
     super.initState();
@@ -154,7 +157,7 @@ class _BrickGameScreenState extends State<BrickGameScreen>
           ),
         ],
       ),
-      bottomNavigationBar: SafeArea(child: _cheatBar()),
+      // 하단 치트 바는 패널로 옮겼다 (2026-09-07) — 경기장 세로가 40px 늘었다
       // SafeArea — 안드로이드 하단 버튼·노치에 경기장이 가리지 않게 (2026-09-07)
       body: SafeArea(
         child: Padding(
@@ -163,9 +166,14 @@ class _BrickGameScreenState extends State<BrickGameScreen>
           focusNode: _focusNode,
           autofocus: true,
           onKeyEvent: (e) {
-            if (e is KeyDownEvent && e.logicalKey == LogicalKeyboardKey.space) {
+            if (e is! KeyDownEvent) return;
+            if (e.logicalKey == LogicalKeyboardKey.space) {
               _primaryAction();
+              return;
             }
+            // 크기 전환 1·2·3 — 패널이 안 뜨는 좁은 화면에서도 되게 키를 남긴다
+            final p = _presetKeys[e.logicalKey];
+            if (p != null) _setPreset(p);
           },
           child: LayoutBuilder(
             builder: (context, constraints) {
@@ -181,6 +189,7 @@ class _BrickGameScreenState extends State<BrickGameScreen>
               // 입력 좌표가 경기장 기준이 되도록 SizedBox **안쪽**에 붙인다.
               final size = BrickState.fitField(
                 Size(gameWidth, constraints.maxHeight),
+                maxHeight: BrickState.presetHeight(_preset),
               );
               if (size != _state.fieldSize) {
                 _state.resize(size);
@@ -221,7 +230,13 @@ class _BrickGameScreenState extends State<BrickGameScreen>
                 children: [
                   Expanded(child: field),
                   const SizedBox(width: DevPanel.gap),
-                  DevPanel(state: _state, log: _log),
+                  DevPanel(
+                    state: _state,
+                    log: _log,
+                    preset: _preset,
+                    onCheat: _runCheat,
+                    onPreset: _setPreset,
+                  ),
                 ],
               );
             },
@@ -352,83 +367,38 @@ class _BrickGameScreenState extends State<BrickGameScreen>
     );
   }
 
-  // ─── 테스트용 (나중에 가리거나 지울 것) ────────────────────────
+  // ─── 치트 (개발자 패널에서 부른다) ──────────────────────────
   //
   //  상세 설명 : 각 상황을 손으로 만들려면 한 판을 다 해야 해서 확인이 느리다.
-  //    이 줄의 버튼으로 바로 이동한다. 목숨·점수 정합성은 따지지 않는다.
-  Widget _cheatBar() {
-    return SafeArea(
-      child: Container(
-        color: const Color(0xFF161B22),
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children: [
-            // 테스트용 — 경기장 크기와 배율. 창을 움직일 때 값이 바뀌는지 눈으로 본다
-            SizedBox(
-              width: 108,
-              child: Text(
-                '${_state.fieldSize.width.round()}×${_state.fieldSize.height.round()}'
-                '  ×${_state.scale.toStringAsFixed(2)}',
-                textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 11, color: Color(0xFF7BE38B)),
-              ),
-            ),
-            _cheatButton('SAMPLE', _state.debugLoadSampleStage),
-            _cheatIcon(
-              Icons.chevron_left,
-              () => _state.debugGoToStage(_state.stage - 1),
-            ),
-            SizedBox(
-              width: 64,
-              child: Text(
-                _state.isSampleStage ? 'SAMPLE' : 'STAGE ${_state.stage}',
-                textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 11, color: Colors.white70),
-              ),
-            ),
-            _cheatIcon(
-              Icons.chevron_right,
-              () => _state.debugGoToStage(_state.stage + 1),
-            ),
-            _cheatButton('GAME OVER', _state.debugGameOver),
-            _cheatButton('CLEARED', _state.debugClearStage),
-          ],
-        ),
-      ),
-    );
+  //    버튼으로 바로 이동한다. 목숨·점수 정합성은 따지지 않는다.
+  //
+  //  주요 로직 : 실행 뒤 **초점을 게임으로 되돌린다.** 안 되돌리면 버튼을
+  //    한 번 누른 순간부터 스페이스·숫자키가 버튼으로 가서 게임에 안 들어온다.
+
+  void _runCheat(VoidCallback action) {
+    setState(action);
+    _focusNode.requestFocus();
   }
 
-  Widget _cheatIcon(IconData icon, VoidCallback action) {
-    return IconButton(
-      iconSize: 20,
-      visualDensity: VisualDensity.compact,
-      padding: EdgeInsets.zero,
-      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-      color: Colors.white60,
-      icon: Icon(icon),
-      onPressed: () {
-        setState(action);
-        _focusNode.requestFocus();
-      },
-    );
+  /// 경기장 크기 단계를 바꾼다.
+  ///
+  /// 주요 로직 : 크기 자체는 여기서 계산하지 않는다. 단계만 바꿔 두면
+  ///   다음 build 의 `fitField` 가 상한으로 반영하고, `resize()` 가
+  ///   날아가던 공의 속력까지 다시 맞춘다 — 계산이 한 군데에만 있다.
+  void _setPreset(FieldPreset p) {
+    setState(() => _preset = p);
+    _focusNode.requestFocus();
   }
 
-  Widget _cheatButton(String text, VoidCallback action) {
-    return TextButton(
-      style: TextButton.styleFrom(
-        minimumSize: Size.zero,
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-        foregroundColor: Colors.white60,
-      ),
-      onPressed: () {
-        setState(action);
-        _focusNode.requestFocus();
-      },
-      child: Text(text, style: const TextStyle(fontSize: 11)),
-    );
-  }
+  /// 숫자키 ↔ 크기 단계
+  static final Map<LogicalKeyboardKey, FieldPreset> _presetKeys = {
+    LogicalKeyboardKey.digit1: FieldPreset.small,
+    LogicalKeyboardKey.digit2: FieldPreset.medium,
+    LogicalKeyboardKey.digit3: FieldPreset.large,
+    LogicalKeyboardKey.numpad1: FieldPreset.small,
+    LogicalKeyboardKey.numpad2: FieldPreset.medium,
+    LogicalKeyboardKey.numpad3: FieldPreset.large,
+  };
 
   Widget _label(String text) => Text(
         text,

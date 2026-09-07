@@ -4,7 +4,7 @@
 //
 //  주요 기능 : 게임 오른쪽에 상태 값과 최근 사건을 띄운다.
 //              화면이 넓을 때만 나오고, 좁으면 게임만 남는다
-//  제외 사항 : 게임 규칙·계산 (전부 BrickState) · 치트 버튼(아직 하단 바에 있다)
+//  제외 사항 : 게임 규칙·계산 (전부 BrickState)
 //
 //  상세 설명 : 목적은 디버깅보다 **개발 과정을 보여주는 것**이다.
 //    결과물만 보면 「벽돌깨기 하나」지만, 상태를 한 곳에서 관리하고
@@ -14,6 +14,11 @@
 //    웹으로 배포하므로 폰도 브라우저로 들어온다 — 「브라우저냐」로는 PC/폰이 안 갈린다.
 //    폭이 모자라면 패널을 숨기므로 **게임이 줄어들 일이 없다.**
 //    이 방식은 폴더블·태블릿·터치 PC 같은 예외가 생기지 않는다.
+//
+//  주요 로직 : 치트는 **하단 바에서 이걸로 옮겨 왔다** (2026-09-07).
+//    하단 바가 없어져 경기장 세로가 40px 늘고, 좁은 화면(폰)에서는 치트가 아예
+//    안 보인다 — 원래 보여줄 것이 아니었으므로 이 편이 맞다.
+//    크기 전환(S·M·L)만은 **숫자키 1·2·3** 으로도 되게 해 두었다.
 //
 //  주요 로직 : 사건 로그는 **같은 사건이 이어지면 한 줄에 ×N 으로 합친다.**
 //    벽 반사는 초당 몇 번씩 들어와, 합치지 않으면 열두 줄이 전부 wallHit 이 되고
@@ -82,10 +87,29 @@ class EventLogLine {
 }
 
 class DevPanel extends StatelessWidget {
-  const DevPanel({required this.state, required this.log, super.key});
+  const DevPanel({
+    required this.state,
+    required this.log,
+    required this.preset,
+    required this.onCheat,
+    required this.onPreset,
+    super.key,
+  });
 
   final BrickState state;
   final EventLog log;
+
+  /// 지금 걸려 있는 크기 단계 — 버튼 강조에만 쓴다
+  final FieldPreset preset;
+
+  /// 상태를 바꾸는 치트를 실행한다.
+  ///
+  /// 주요 로직 : 패널이 직접 `setState` 를 부를 수 없어 화면에 넘긴다.
+  ///   화면 쪽에서 갱신과 **초점 되돌리기**를 함께 한다 — 안 되돌리면
+  ///   버튼을 한 번 누른 뒤로 스페이스·숫자키가 먹지 않는다.
+  final void Function(VoidCallback action) onCheat;
+
+  final void Function(FieldPreset preset) onPreset;
 
   /// 패널 폭(px). 고정이다 — 남는 공간을 나눠 가지면 게임 크기가 창에 따라 흔들린다
   static const double width = 300;
@@ -127,7 +151,11 @@ class DevPanel extends StatelessWidget {
           _title('EVENTS'),
           const SizedBox(height: 6),
           Expanded(child: _eventList()),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
+          _title('CHEATS'),
+          const SizedBox(height: 6),
+          _cheats(),
+          const SizedBox(height: 10),
           _note(),
         ],
       ),
@@ -237,6 +265,114 @@ class DevPanel extends StatelessWidget {
       ),
     );
   }
+
+  /// 치트 — 상황을 손으로 만들려면 한 판을 다 해야 해서 확인이 느리다.
+  /// 목숨·점수 정합성은 따지지 않는다.
+  Widget _cheats() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // 크기 — 화면이 난이도를 바꾸지 않는지 보는 용도. 숫자키 1·2·3 과 같다
+        Row(
+          children: [
+            const SizedBox(
+              width: 44,
+              child: Text('size', style: TextStyle(fontSize: 11, color: _dim)),
+            ),
+            for (final p in FieldPreset.values)
+              Padding(
+                padding: const EdgeInsets.only(right: 4),
+                child: _sizeButton(p),
+              ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        // 스테이지 — 좌우로 옮기고, SAMPLE 은 아이템 시험 전용
+        Row(
+          children: [
+            const SizedBox(
+              width: 44,
+              child: Text('stage', style: TextStyle(fontSize: 11, color: _dim)),
+            ),
+            _iconButton(Icons.chevron_left,
+                () => state.debugGoToStage(state.stage - 1)),
+            SizedBox(
+              width: 52,
+              child: Text(
+                state.isSampleStage ? 'SAMPLE' : '${state.stage}',
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 11, color: _fg),
+              ),
+            ),
+            _iconButton(Icons.chevron_right,
+                () => state.debugGoToStage(state.stage + 1)),
+            const SizedBox(width: 4),
+            _textButton('SAMPLE', state.debugLoadSampleStage),
+          ],
+        ),
+        const SizedBox(height: 4),
+        // 끝난 화면 — 두 상태를 바로 만든다
+        Row(
+          children: [
+            const SizedBox(
+              width: 44,
+              child: Text('end', style: TextStyle(fontSize: 11, color: _dim)),
+            ),
+            _textButton('GAME OVER', state.debugGameOver),
+            const SizedBox(width: 4),
+            _textButton('CLEARED', state.debugClearStage),
+          ],
+        ),
+      ],
+    );
+  }
+
+  /// 지금 단계는 테두리로 표시한다 — 색만 바꾸면 어느 쪽이 켜진 건지 헷갈린다
+  Widget _sizeButton(FieldPreset p) {
+    final on = p == preset;
+    final label = switch (p) {
+      FieldPreset.small => 'S',
+      FieldPreset.medium => 'M',
+      FieldPreset.large => 'L',
+    };
+    return SizedBox(
+      width: 34,
+      height: 26,
+      child: OutlinedButton(
+        style: OutlinedButton.styleFrom(
+          padding: EdgeInsets.zero,
+          minimumSize: Size.zero,
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          side: BorderSide(color: on ? _accent : const Color(0xFF2A323D)),
+          foregroundColor: on ? _accent : _dim,
+        ),
+        onPressed: () => onPreset(p),
+        child: Text('$label${p.index + 1}',
+            style: const TextStyle(fontSize: 10, letterSpacing: 0.5)),
+      ),
+    );
+  }
+
+  Widget _iconButton(IconData icon, VoidCallback action) => IconButton(
+        iconSize: 18,
+        visualDensity: VisualDensity.compact,
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints(minWidth: 28, minHeight: 26),
+        color: _dim,
+        icon: Icon(icon),
+        onPressed: () => onCheat(action),
+      );
+
+  Widget _textButton(String text, VoidCallback action) => TextButton(
+        style: TextButton.styleFrom(
+          minimumSize: Size.zero,
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          foregroundColor: _dim,
+        ),
+        onPressed: () => onCheat(action),
+        child: Text(text, style: const TextStyle(fontSize: 10)),
+      );
 
   Widget _note() => const Text(
         '상태는 소리를 내지 않는다.\n무슨 일이 있었는지만 남기고, 재생은 화면이 맡는다.',

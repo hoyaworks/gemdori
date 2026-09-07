@@ -34,6 +34,46 @@ void main() {
     });
   });
 
+  group('크기 단계 (치트)', () {
+    test('큰 단계는 상한 그대로 — 평소 동작과 같다', () {
+      expect(BrickState.presetHeight(FieldPreset.large),
+          BrickState.maxFieldHeight);
+    });
+
+    test('단계마다 크기가 실제로 달라진다', () {
+      Size sizeOf(FieldPreset p) => BrickState.fitField(
+            const Size(2000, 2000),
+            maxHeight: BrickState.presetHeight(p),
+          );
+      expect(sizeOf(FieldPreset.small).height, 360);
+      expect(sizeOf(FieldPreset.medium).height, 440);
+      expect(sizeOf(FieldPreset.large).height, 520);
+      // 비율(2:3)은 단계와 무관하게 유지된다
+      for (final p in FieldPreset.values) {
+        final s = sizeOf(p);
+        expect(s.width / s.height, closeTo(BrickState.fieldAspect, 1e-9));
+      }
+    });
+
+    test('화면이 그보다 작으면 화면에 맞춘다 — 넘치지 않는다', () {
+      final s = BrickState.fitField(
+        const Size(200, 300),
+        maxHeight: BrickState.presetHeight(FieldPreset.large),
+      );
+      expect(s.height, lessThanOrEqualTo(300));
+      expect(s.width, lessThanOrEqualTo(200));
+    });
+
+    test('단계를 바꿔도 난이도 기준은 그대로 — 패들이 폭의 15%', () {
+      for (final p in FieldPreset.values) {
+        final size = BrickState.fitField(const Size(2000, 2000),
+            maxHeight: BrickState.presetHeight(p));
+        final st = BrickState(fieldSize: size);
+        expect(st.basePaddleWidth / size.width, closeTo(0.15, 1e-9));
+      }
+    });
+  });
+
   group('EventLog', () {
     test('같은 사건이 이어지면 한 줄로 합쳐 센다', () {
       final log = EventLog()

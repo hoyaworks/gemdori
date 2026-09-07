@@ -38,6 +38,10 @@ import 'item.dart';
 /// 게임 진행 상태
 enum GameStatus { ready, playing, cleared, gameOver }
 
+/// 경기장 크기 전환 단계 (치트 전용 · 2026-09-07).
+/// 실제 값은 [BrickState.presetHeight] 에 있다
+enum FieldPreset { small, medium, large }
+
 /// 소리를 붙일 「방금 일어난 일」 (2026-09-04)
 ///
 /// 주요 로직 : 상태(BrickState)는 **소리를 재생하지 않는다.** 무슨 일이 있었는지만 남긴다.
@@ -357,7 +361,9 @@ class BrickState {
   ///   위아래로 길수록 공이 오가는 시간이 늘어 쉬워지고, 넓적하면 어려워진다.
   ///   비율을 고정하면 스테이지 표(속도·아이템 수)가 **모든 화면에서 그대로 유효**하다.
   ///   남는 공간은 배경색으로 비운다 — 늘리는 쪽은 전부 난이도를 건드린다.
-  static Size fitField(Size available) {
+  ///   [maxHeight] 로 상한을 더 낮출 수 있다 — 치트의 크기 전환(S·M·L)이 쓴다.
+  ///   **낮추는 쪽으로만 쓴다.** 화면보다 크게 달라고 해도 들어가는 크기를 넘지 않는다.
+  static Size fitField(Size available, {double maxHeight = maxFieldHeight}) {
     if (available.width <= 0 || available.height <= 0) return Size.zero;
 
     var h = available.height;
@@ -366,12 +372,29 @@ class BrickState {
       w = available.width;
       h = w / fieldAspect;
     }
-    if (h > maxFieldHeight) {
-      h = maxFieldHeight;
-      w = maxFieldWidth;
+    if (h > maxHeight) {
+      h = maxHeight;
+      w = h * fieldAspect;
     }
     return Size(w, h);
   }
+
+  /// 크기 전환 단계 — 치트 전용 (2026-09-07)
+  ///
+  /// 주요 로직 : 이 버튼의 목적은 「크게 보기」가 아니라
+  ///   **「화면 크기가 난이도를 바꾸지 않는가」를 눈으로 확인하는 것**이다.
+  ///   그래서 값을 예쁜 수가 아니라 **실제로 만나는 크기**에 맞춰 잡았다.
+  ///
+  ///   large  520 — 상한 그대로. PC 브라우저에서 늘 걸리는 값이라 **기본값**
+  ///   medium 440 — **폭 320px 폰의 실제 크기**(경기장 ≈293×440). 가장 작은 실기기
+  ///   small  360 — 실기기보다 **한 단계 아래**. 최악을 미리 보는 값이자,
+  ///                그 아래로는 벽돌 사이 간격(6px×0.4=2.4)과 아이템 기호가 뭉개져
+  ///                눈으로 판별이 안 되는 **실용 하한**
+  static double presetHeight(FieldPreset p) => switch (p) {
+        FieldPreset.small => 360,
+        FieldPreset.medium => 440,
+        FieldPreset.large => maxFieldHeight,
+      };
 
   /// 아직 화면이 가져가지 않은 사건들.
   ///
