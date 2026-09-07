@@ -26,6 +26,15 @@
 //  주요 로직 : 재생기(플레이어)를 미리 여러 개 만들어 돌려 쓴다.
 //    하나로 돌리면 앞 소리가 끊기고, 매번 새로 만들면 소리가 늦게 난다.
 //
+//  ⭐ 주요 로직 : **소리 파일을 미리 받아 둔다**(warmUp · 2026-09-07).
+//    증상 : 브라우저를 켜고 **맨 처음 발사할 때만** 화면이 한 번 버벅였다.
+//      앱 안에서 다시 시작하거나 홈에 갔다 와도 그 뒤로는 멀쩡했다.
+//    원인 : 첫 재생 순간에 파일을 **내려받고 디코딩**한다. 그 일이 발사와 같은
+//      프레임에 몰려, 게임이 막 움직이기 시작하는 순간을 잡아먹는다.
+//      두 번째부터는 브라우저에 남아 있어 아무 일도 안 일어난다.
+//    대책 : 화면이 열릴 때 **소리 없이 파일만 먼저 물려 둔다.**
+//      실패해도 그냥 넘어간다 — 데우기가 안 되면 예전처럼 조금 버벅일 뿐이다.
+//
 // ═══════════════════════════════════════════════════════════════════
 
 import 'package:audioplayers/audioplayers.dart';
@@ -84,11 +93,36 @@ const Set<GameEventType> _hitEvents = {
 ///   그 사건이 싣고 오는 내구도가 항상 1이다. 색 정보가 남아 있지 않다.
 const Map<int, double> _hitRate = {1: 1.00, 2: 0.92, 3: 0.84};
 
+/// 쓰는 소리 파일 전부 — 데우기 대상.
+///
+/// 주요 로직 : 위 표들에서 **뽑아 만든다.** 손으로 또 적으면
+///   소리를 하나 추가했을 때 데우기에서만 빠져 그 소리만 늦게 난다.
+final List<String> _allFiles = {
+  ..._hitPair,
+  ..._solo.values.map((v) => v.$1),
+}.toList();
+
 class GameSound {
   GameSound({int players = 6})
       : _pool = List.generate(players, (_) => AudioPlayer()) {
     for (final p in _pool) {
       p.setReleaseMode(ReleaseMode.stop);
+    }
+  }
+
+  /// 소리 파일을 미리 받아 둔다 — **소리는 나지 않는다**(재생이 아니라 물리기만).
+  ///
+  /// 주요 로직 : 재생기마다 다른 파일을 물려 한 번에 받아 둔다.
+  ///   재생은 어차피 돌려쓰기라 어느 재생기가 어느 파일을 맡는지는 상관없다.
+  ///   중요한 것은 **파일이 이미 받아져 있다는 것**뿐이다.
+  Future<void> warmUp() async {
+    for (var i = 0; i < _allFiles.length; i++) {
+      final player = _pool[i % _pool.length];
+      try {
+        await player.setSource(AssetSource(_allFiles[i]));
+      } catch (_) {
+        // 데우기 실패는 무시한다 — 소리는 곁가지고, 실패해도 게임은 돈다
+      }
     }
   }
 

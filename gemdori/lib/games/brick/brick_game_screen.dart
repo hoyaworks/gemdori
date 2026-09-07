@@ -71,6 +71,8 @@ class _BrickGameScreenState extends State<BrickGameScreen>
     super.initState();
     _state = BrickState(fieldSize: const Size(320, 480));
     _ticker = createTicker(_onTick)..start();
+    // 첫 발사 때 소리 파일을 받느라 버벅이지 않게 미리 물려 둔다 (2026-09-07)
+    _sound.warmUp();
   }
 
   void _onTick(Duration elapsed) {
