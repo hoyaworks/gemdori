@@ -23,8 +23,14 @@
 //    무적공이 한 프레임에 벽돌을 여러 개 부수면 소리가 겹쳐 터진다.
 //    간격 안에 다시 들어온 소리는 버린다.
 //
-//  주요 로직 : 재생기(플레이어)를 미리 여러 개 만들어 돌려 쓴다.
-//    하나로 돌리면 앞 소리가 끊기고, 매번 새로 만들면 소리가 늦게 난다.
+//  ⭐ 주요 로직 : **파일마다 전용 재생기를 둔다** (2026-09-07 재설계).
+//    예전에는 재생기 여러 개를 **돌려 썼다**. 그러면 재생기가 낼 파일이 매번 바뀌어,
+//    **그 재생기가 그 파일을 처음 내는 순간**마다 파일을 물리는 일이 벌어진다.
+//    증상 : 소리 종류가 하나씩 처음 날 때마다 공이 **한 번씩 뚝 끊긴다**
+//      (프레임이 몇 장 빠진 것처럼 보인다). 첫 발사 때의 버벅임과는 다른 것이다.
+//    지금은 재생기가 **자기 파일 하나만** 평생 낸다 — 물리는 일이 데우기 때 끝나고,
+//    재생은 「처음으로 되감아 다시 틀기」뿐이라 게임 중에 새로 할 일이 없다.
+//    겹칠 수 있는 충돌음(딩·동)만 재생기를 두 개씩 준다.
 //
 //  ⭐ 주요 로직 : **소리 파일을 미리 받아 둔다**(warmUp · 2026-09-07).
 //    증상 : 브라우저를 켜고 **맨 처음 발사할 때만** 화면이 한 번 버벅였다.
@@ -102,29 +108,35 @@ final List<String> _allFiles = {
   ..._solo.values.map((v) => v.$1),
 }.toList();
 
+/// 파일마다 둘 재생기 수 — 겹쳐 날 수 있는 충돌음만 두 개.
+///
+/// 주요 로직 : 하나로 두면 앞 소리가 채 끝나기 전에 다시 틀 때 **잘린다.**
+///   나머지 소리는 서로 45ms 이상 떨어져 있어 하나로 충분하다.
+int _playersFor(String file) => _hitPair.contains(file) ? 2 : 1;
+
 class GameSound {
-  GameSound({int players = 6})
-      : _pool = List.generate(players, (_) => AudioPlayer()) {
-    for (final p in _pool) {
-      p.setReleaseMode(ReleaseMode.stop);
+  GameSound()
+      : _byFile = {
+          for (final f in _allFiles)
+            f: List.generate(_playersFor(f), (_) => AudioPlayer()),
+        } {
+    for (final players in _byFile.values) {
+      for (final p in players) {
+        p.setReleaseMode(ReleaseMode.stop);
+      }
     }
   }
 
-  /// 소리 파일을 미리 받아 둔다 — **소리는 나지 않는다**(재생이 아니라 물리기만).
+  /// 재생기마다 **자기 파일을 물려 둔다** — 소리는 나지 않는다.
   ///
-  /// ⭐ 주요 로직 : **재생기 전부에 파일 전부를** 물린다 (2026-09-07 확대).
-  ///   처음에는 재생기마다 파일 하나씩만 물렸다. 그랬더니 첫 발사는 나아졌는데
-  ///   **공이 굴러가다 규칙적으로 끊기는** 느낌이 남았다 —
-  ///   재생기는 돌려쓰기라, 어떤 재생기가 **처음 만나는 파일**을 낼 때마다
-  ///   그 자리에서 또 받아 오기 때문이다(벽·패들·벽돌… 순서대로 한 번씩).
-  ///   6×6 을 미리 다 물려 두면 게임 중에 처음 만나는 조합이 남지 않는다.
-  ///
-  ///   ⚠️ 그만큼 시간이 걸리므로 **로딩 표시 뒤에서** 돌린다 — 화면 쪽 `_prepare()`.
+  /// 주요 로직 : 이 한 번으로 끝난다. 재생기는 평생 이 파일만 내므로
+  ///   게임 중에 다시 물릴 일이 없다 — 끊김의 원인이 여기서 사라진다.
+  ///   ⚠️ 시간이 걸리므로 **로딩 막 뒤에서** 돌린다 (화면 쪽 `prepareGame()`).
   Future<void> warmUp() async {
-    for (final player in _pool) {
-      for (final file in _allFiles) {
+    for (final entry in _byFile.entries) {
+      for (final player in entry.value) {
         try {
-          await player.setSource(AssetSource(file));
+          await player.setSource(AssetSource(entry.key));
         } catch (_) {
           // 데우기 실패는 무시한다 — 소리는 곁가지고, 실패해도 게임은 돈다
         }
@@ -132,8 +144,11 @@ class GameSound {
     }
   }
 
-  final List<AudioPlayer> _pool;
-  int _next = 0;
+  /// 파일 → 그 파일 전용 재생기들
+  final Map<String, List<AudioPlayer>> _byFile;
+
+  /// 파일별 다음 차례 (재생기가 둘인 것만 실제로 돈다)
+  final Map<String, int> _turn = {};
 
   /// 번갈이 차례 — 딩(0) ↔ 동(1)
   int _alt = 0;
@@ -186,18 +201,29 @@ class GameSound {
     // 이렇게 해야 발사 직후 같은 소리가 두 번 겹치지 않는다.
     if (ch == _Ch.launch) _alt = 1;
 
-    final player = _pool[_next];
-    _next = (_next + 1) % _pool.length;
+    final players = _byFile[file];
+    if (players == null) return;
+    final i = (_turn[file] ?? 0) % players.length;
+    _turn[file] = i + 1;
+    final player = players[i];
 
+    // 주요 로직 : **다시 틀지 않고 되감아 튼다.**
+    //   `play(AssetSource…)` 는 파일을 다시 물리는 길이라, 그 순간 화면이 끊긴다.
+    //   이미 물려 둔 것을 처음으로 되감아(`seek`) 재생(`resume`)만 한다.
+    //
     // 실패해도 게임은 계속되어야 한다 — 소리는 곁가지다.
     // (웹은 첫 조작 전에 재생이 막혀 있어 여기서 예외가 날 수 있다)
+    player.setVolume(volume).catchError((_) {});
     player.setPlaybackRate(rate).catchError((_) {});
-    player.play(AssetSource(file), volume: volume).catchError((_) {});
+    player.seek(Duration.zero).catchError((_) {});
+    player.resume().catchError((_) {});
   }
 
   void dispose() {
-    for (final p in _pool) {
-      p.dispose();
+    for (final players in _byFile.values) {
+      for (final p in players) {
+        p.dispose();
+      }
     }
   }
 }
