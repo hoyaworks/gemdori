@@ -10,9 +10,13 @@
 //     구조 : 화면은 `DevPanel.visibleIn()` · `DevPanel.gameWidth()` 두 개만 묻고,
 //     그 안에서 `devMode` 를 본다 — 화면 코드에는 개발용 분기가 남지 않는다.
 //
-//  상세 설명 : 목적은 디버깅보다 **개발 과정을 보여주는 것**이다.
-//    결과물만 보면 「벽돌깨기 하나」지만, 상태를 한 곳에서 관리하고
-//    상태가 소리 대신 사건만 내보낸다는 설계는 이 패널로만 드러난다.
+//  상세 설명 : 목적은 디버깅과 **개발 과정을 보여주는 것** 둘 다다.
+//    결과물만 보면 「벽돌깨기 하나」지만, 이런 도구를 만들어 두고 개발했다는 사실
+//    자체가 「무엇이 필요한지 알고 만드는 사람」이라는 뜻이 된다.
+//
+//  ⛔ **설명을 적는 자리가 아니다** (2026-09-07 확인).
+//     여기 들어갈 것은 **개발하며 실제로 보던 값과 도구**뿐이다.
+//     글로 설명하면 「도구」가 아니라 「소개문」이 되어, 보여주려던 것이 오히려 사라진다.
 //
 //  주요 로직 : 표시 여부를 **디바이스가 아니라 「폭이 남는가」로** 가른다.
 //    웹으로 배포하므로 폰도 브라우저로 들어온다 — 「브라우저냐」로는 PC/폰이 안 갈린다.
@@ -165,8 +169,6 @@ class DevPanel extends StatelessWidget {
           _title('CHEATS'),
           const SizedBox(height: 6),
           _cheats(),
-          const SizedBox(height: 10),
-          _note(),
         ],
       ),
     );
@@ -382,10 +384,5 @@ class DevPanel extends StatelessWidget {
         ),
         onPressed: () => onCheat(action),
         child: Text(text, style: const TextStyle(fontSize: 10)),
-      );
-
-  Widget _note() => const Text(
-        '상태는 소리를 내지 않는다.\n무슨 일이 있었는지만 남기고, 재생은 화면이 맡는다.',
-        style: TextStyle(fontSize: 10, height: 1.5, color: _dim),
       );
 }
