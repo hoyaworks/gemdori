@@ -24,6 +24,7 @@ import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 
 import '../../app/dev_mode.dart';
+import '../../app/game_loading.dart';
 import 'brick_painter.dart';
 import 'brick_state.dart';
 import 'dev_panel.dart';
@@ -37,7 +38,7 @@ class BrickGameScreen extends StatefulWidget {
 }
 
 class _BrickGameScreenState extends State<BrickGameScreen>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, GameLoadingMixin {
   late final Ticker _ticker;
   late BrickState _state;
   Duration _lastTick = Duration.zero;
@@ -66,41 +67,17 @@ class _BrickGameScreenState extends State<BrickGameScreen>
   /// 지금 패널이 떠 있는가 — build 에서 정해 두고 게임 루프가 읽는다
   bool _showPanel = false;
 
-  /// 준비가 끝났는가. false 인 동안 **로딩 막이 덮이고 조작이 막힌다**
-  bool _ready = false;
-
-  /// 로딩 막을 최소한 이만큼은 띄운다 — 준비가 빨리 끝나도 **깜빡이지 않게**
-  static const int _minLoadingMs = 300;
-
-  /// 들어오자마자 할 준비 — 이게 끝나야 조작을 받는다.
-  ///
-  ///  상세 설명 : 「처음 한 번만 버벅인다」는 것은 **그때 처음 하는 일이 있다**는 뜻이다.
-  ///    그 일을 **게임이 움직이기 전에** 끝내 놓는 것이 이 함수의 전부다.
-  ///
-  ///  주요 로직 : 화면을 **먼저 그리고 그 위를 덮는다.** 막을 먼저 씌우고 나중에
-  ///    게임을 그리면, 막이 걷히는 순간 그리기 준비(셰이더 컴파일)가 시작돼
-  ///    같은 버벅임이 그때로 옮겨 갈 뿐이다. 그래서 `endOfFrame` 을 기다려
-  ///    **한 프레임이 실제로 그려진 것을 확인한 뒤** 소리를 데운다.
-  Future<void> _prepare() async {
-    final started = DateTime.now();
-    final binding = WidgetsBinding.instance;
-
-    await binding.endOfFrame; // ① 게임 화면이 한 번 그려진다 (막 아래에서)
-    await _sound.warmUp(); //    ② 소리 파일을 전부 받아 둔다
-    await binding.endOfFrame; //  ③ 그 사이 밀린 프레임을 흘려보낸다
-
-    final left = _minLoadingMs - DateTime.now().difference(started).inMilliseconds;
-    if (left > 0) await Future.delayed(Duration(milliseconds: left));
-    if (!mounted) return;
-    setState(() => _ready = true);
-  }
+  /// ⭐ **이 게임이 미리 받아 둘 것** — 로딩 막의 규칙 자체는 `GameLoadingMixin` 에 있다.
+  ///   벽돌깨기는 소리뿐이다. 나중에 이미지·폰트가 생기면 여기 한 줄씩 늘린다.
+  @override
+  Future<void> prepareGame() => _sound.warmUp();
 
   @override
   void initState() {
     super.initState();
     _state = BrickState(fieldSize: const Size(320, 480));
     _ticker = createTicker(_onTick)..start();
-    _prepare();
+    startPreparing();
   }
 
   void _onTick(Duration elapsed) {
@@ -115,7 +92,7 @@ class _BrickGameScreenState extends State<BrickGameScreen>
   }
 
   void _movePaddle(Offset localPos) {
-    if (!_ready) return; // 준비 중에는 조작을 받지 않는다
+    if (!ready) return; // 준비 중에는 조작을 받지 않는다
     if (_state.paused) return; // 멈춘 동안에는 패들도 따라오지 않는다
     setState(() => _state.movePaddleTo(localPos.dx));
   }
@@ -125,7 +102,7 @@ class _BrickGameScreenState extends State<BrickGameScreen>
   /// 주요 로직 : 끝난 화면에서는 아무 반응도 하지 않는다.
   ///   화면 아무 곳이나 눌러 다시 시작되면 홈/다시시작 선택 버튼을 누를 새가 없다.
   void _primaryAction() {
-    if (!_ready) return; // 준비 중에는 발사되지 않는다
+    if (!ready) return; // 준비 중에는 발사되지 않는다
     // 일시정지 중이면 푸는 것이 먼저다 (2026-09-04).
     // 여기서 걸러 내지 않으면 푸는 동작이 그대로 발사로 이어진다.
     if (_state.paused) {
@@ -146,50 +123,8 @@ class _BrickGameScreenState extends State<BrickGameScreen>
 
   @override
   Widget build(BuildContext context) {
-    final game = _gameScaffold();
-    if (_ready) return game;
-    // 준비 중 — 게임 화면은 **이미 그려 두고** 그 위를 덮는다
-    return Stack(fit: StackFit.expand, children: [game, _loadingLayer()]);
-  }
-
-  /// 준비가 끝날 때까지 덮는 막.
-  ///
-  /// 주요 로직 : 반투명으로 둔다 — 아래에 게임이 **이미 그려져 있다**는 것이
-  ///   눈으로도 보이고, 걷힐 때 화면이 갑자기 나타나지 않는다.
-  Widget _loadingLayer() {
-    return Positioned.fill(
-      child: GestureDetector(
-        // 터치·클릭은 여기서 전부 삼킨다 (아래 게임으로 내려가지 않게)
-        behavior: HitTestBehavior.opaque,
-        onTap: () {},
-        child: Container(
-          color: const Color(0xE60B0E13),
-          alignment: Alignment.center,
-          child: const Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              SizedBox(
-                width: 26,
-                height: 26,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2.5,
-                  color: Color(0xFF7BE38B),
-                ),
-              ),
-              SizedBox(height: 14),
-              Text(
-                'LOADING',
-                style: TextStyle(
-                  fontSize: 13,
-                  letterSpacing: 3,
-                  color: Color(0xFFBFC7D5),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+    // 준비 중이면 게임 화면을 **이미 그려 둔 채로** 그 위가 덮인다
+    return wrapWithLoading(_gameScaffold());
   }
 
   Widget _gameScaffold() {
@@ -255,7 +190,7 @@ class _BrickGameScreenState extends State<BrickGameScreen>
             if (e is! KeyDownEvent) return;
             // ⭐ 막은 **화면만 가린다.** 키보드는 막 아래로 그대로 들어오므로
             //   여기서 따로 끊어야 한다 — 안 그러면 스페이스로 발사돼 버린다
-            if (!_ready) return;
+            if (!ready) return;
             if (e.logicalKey == LogicalKeyboardKey.space) {
               _primaryAction();
               return;
