@@ -202,7 +202,7 @@ class BrickState {
   Offset get ballPos => balls.isEmpty ? Offset.zero : balls.first.pos;
   set ballPos(Offset v) {
     if (balls.isEmpty) {
-      balls = [Ball(pos: v, velocity: Offset.zero, radius: ballRadius)];
+      balls = [Ball(pos: v, velocity: Offset.zero)];
     } else {
       balls.first.pos = v;
     }
@@ -212,7 +212,7 @@ class BrickState {
       balls.isEmpty ? Offset.zero : balls.first.velocity;
   set ballVelocity(Offset v) {
     if (balls.isEmpty) {
-      balls = [Ball(pos: Offset.zero, velocity: v, radius: ballRadius)];
+      balls = [Ball(pos: Offset.zero, velocity: v)];
     } else {
       balls.first.velocity = v;
     }
@@ -959,7 +959,6 @@ class BrickState {
     balls.add(Ball(
       pos: src.pos,
       velocity: Offset(sin(base + spread) * speed, -cos(base + spread) * speed),
-      radius: src.radius,
     ));
   }
 
@@ -985,7 +984,6 @@ class BrickState {
       added.add(Ball(
         pos: src.pos,
         velocity: Offset(sin(angle) * speed, -cos(angle) * speed),
-        radius: src.radius,
       ));
       i++;
     }
@@ -995,11 +993,7 @@ class BrickState {
   /// 공을 하나로 되돌려 패들 위에 얹는다. 멀티볼도 여기서 정리된다.
   void _placeBallOnPaddle() {
     balls = [
-      Ball(
-        pos: Offset(paddleX, paddleTop - ballRadius),
-        velocity: Offset.zero,
-        radius: ballRadius,
-      ),
+      Ball(pos: Offset(paddleX, paddleTop - ballRadius), velocity: Offset.zero),
     ];
   }
 
@@ -1032,8 +1026,8 @@ class BrickState {
     } else {
       for (final b in balls) {
         b.pos = Offset(
-          b.pos.dx.clamp(b.radius, size.width - b.radius),
-          b.pos.dy.clamp(b.radius, size.height - b.radius),
+          b.pos.dx.clamp(ballRadius, size.width - ballRadius),
+          b.pos.dy.clamp(ballRadius, size.height - ballRadius),
         );
       }
     }
@@ -1064,7 +1058,7 @@ class BrickState {
     _moveItems(dt);
 
     // 바닥으로 빠진 공은 없앤다. 남은 공이 하나도 없을 때만 목숨이 준다.
-    balls.removeWhere((b) => b.pos.dy - b.radius > fieldSize.height);
+    balls.removeWhere((b) => b.pos.dy - ballRadius > fieldSize.height);
     if (balls.isEmpty) {
       _loseBall();
       return;
@@ -1127,7 +1121,7 @@ class BrickState {
     final from = ball.pos;
     var next = from + ball.velocity * dt;
     var v = ball.velocity;
-    final r0 = ball.radius;
+    final r0 = ballRadius;
 
     // 1 좌우 벽 — 벽을 넘어간 만큼 **되꺾어서** 진행 방향을 뒤집는다
     //

@@ -127,7 +127,12 @@ class FallingItem {
   /// 낙하 속도(초당 픽셀).
   /// 주요 로직 : 방해 아이템을 더 느리게 떨어뜨린다.
   ///   화면에 오래 남아, 공을 받으러 가다 같이 먹게 되는 상황이 자주 생긴다.
+  ///
+  /// ⚠️ 이 값은 **기준 폭에서의 속도**다. 실제로는 `BrickState._moveItems` 가
+  ///   배율을 곱해 쓴다 — 공 속력과 같은 규칙.
   double get speed => type.isHelp ? 140 : 110;
-
-  static const double radius = 9;
 }
+
+// 크기(반지름)는 여기에 두지 않는다 — `BrickState.itemRadius` 하나뿐이다.
+// 예전에 `FallingItem.radius = 9` 가 있었으나 아무도 쓰지 않았고,
+// 값만 겹쳐 있어 나중에 한쪽만 고칠 위험이 있었다 (2026-09-07 삭제)

@@ -131,8 +131,8 @@ class BrickPainter extends CustomPainter {
     //     · 색은 공과 같이 바뀌고, **깜빡임(나타났다 사라졌다)은 링에만** 준다
     //   그리는 순서도 규칙이다 — 링을 먼저 깔고 공을 그 위에 얹는다.
     final ring = state.invincibleRingOn;
+    final r = state.ballRadius; // 크기는 상태 한 곳에서만 나온다
     for (final ball in state.balls) {
-      final r = ball.radius;
       if (ring) {
         canvas.drawCircle(
           ball.pos,

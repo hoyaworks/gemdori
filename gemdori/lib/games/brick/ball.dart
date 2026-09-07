@@ -3,7 +3,13 @@
 // ═══════════════════════════════════════════════════════════════════
 //
 //  주요 기능 : 공 하나의 위치와 속도
-//  제외 사항 : 충돌 판정 (BrickState 가 한다)
+//  제외 사항 : 충돌 판정 · **크기** (둘 다 BrickState 가 한다)
+//
+//  주요 로직 : 반지름을 여기에 두지 않는다 (2026-09-07 수정).
+//    예전에는 만들 때의 값을 필드로 들고 있었는데, 그 값이 **배율의 스냅샷**이라
+//    화면 크기가 바뀌어도 날아가던 공만 예전 크기로 남았다 —
+//    속도에서 이미 겪은 것과 같은 함정이다(2026-09-07 오전).
+//    크기는 언제나 `BrickState.ballRadius` 하나에서 나온다.
 //
 //  상세 설명 : 공을 클래스로 뺀 이유는 아이템 「멀티볼」 때문이다.
 //    공이 여러 개가 되면 위치·속도를 한 쌍의 값으로 들 수 없다.
@@ -14,18 +20,15 @@
 import 'dart:ui';
 
 class Ball {
-  Ball({required this.pos, required this.velocity, this.radius = 8});
+  Ball({required this.pos, required this.velocity});
 
   Offset pos;
 
   /// 초당 이동 픽셀
   Offset velocity;
 
-  final double radius;
-
   Ball copyWith({Offset? pos, Offset? velocity}) => Ball(
         pos: pos ?? this.pos,
         velocity: velocity ?? this.velocity,
-        radius: radius,
       );
 }

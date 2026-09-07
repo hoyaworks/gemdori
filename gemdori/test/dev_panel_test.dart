@@ -112,6 +112,37 @@ void main() {
     });
   });
 
+  group('크기를 바꿔도 날아가던 공이 따라온다 (2026-09-07 수정)', () {
+    // 속도에서 이미 겪은 함정 — 만들 때 값을 필드로 들고 있으면
+    // 화면 크기가 바뀌어도 **그 공만** 예전 값으로 남는다. 반지름도 같았다.
+    Size fieldOf(FieldPreset p) => BrickState.fitField(
+          const Size(2000, 2000),
+          maxHeight: BrickState.presetHeight(p),
+        );
+
+    test('쏜 뒤에 작게 바꾸면 반지름도 새 배율을 따른다', () {
+      final st = BrickState(fieldSize: fieldOf(FieldPreset.large))..launch();
+      final small = fieldOf(FieldPreset.small);
+      st.resize(small);
+      expect(st.ballRadius / small.width,
+          closeTo(8 / BrickState.defaultRefWidth, 1e-9));
+    });
+
+    test('벽 반사도 새 반지름으로 판정한다', () {
+      final st = BrickState(fieldSize: fieldOf(FieldPreset.large))..launch();
+      final small = fieldOf(FieldPreset.small);
+      st.resize(small);
+      final r = st.ballRadius;
+      st.balls.first
+        ..pos = Offset(r + 1, small.height / 2)
+        ..velocity = const Offset(-200, 0);
+      st.update(0.05);
+      // 새 반지름 기준으로 벽에 닿아 되꺾였다 — 예전 반지름이면 이미 벽을 넘어 있다
+      expect(st.balls.first.velocity.dx, greaterThan(0));
+      expect(st.balls.first.pos.dx, greaterThanOrEqualTo(r - 1e-9));
+    });
+  });
+
   group('EventLog', () {
     test('같은 사건이 이어지면 한 줄로 합쳐 센다', () {
       final log = EventLog()
