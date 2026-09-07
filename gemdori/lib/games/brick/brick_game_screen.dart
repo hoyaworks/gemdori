@@ -25,6 +25,7 @@ import 'package:flutter/services.dart';
 
 import 'brick_painter.dart';
 import 'brick_state.dart';
+import 'sound.dart';
 
 class BrickGameScreen extends StatefulWidget {
   const BrickGameScreen({super.key});
@@ -44,6 +45,9 @@ class _BrickGameScreenState extends State<BrickGameScreen>
   ///   그 결과 키보드 입력(스페이스)이 아예 들어오지 않는다. (2026-09-02 수정)
   final FocusNode _focusNode = FocusNode();
 
+  /// 효과음. 상태가 남긴 사건을 매 프레임 가져가 재생한다
+  final GameSound _sound = GameSound();
+
   @override
   void initState() {
     super.initState();
@@ -56,6 +60,8 @@ class _BrickGameScreenState extends State<BrickGameScreen>
     _lastTick = elapsed;
     final step = dt.clamp(0.0, 1 / 30);
     setState(() => _state.update(step));
+    // 사건은 가져가면서 비워진다 — 화면이 매 프레임 한 번만 부른다
+    _sound.playAll(_state.takeEvents());
   }
 
   void _movePaddle(Offset localPos) {
@@ -82,6 +88,7 @@ class _BrickGameScreenState extends State<BrickGameScreen>
   void dispose() {
     _ticker.dispose();
     _focusNode.dispose();
+    _sound.dispose();
     super.dispose();
   }
 
@@ -116,6 +123,11 @@ class _BrickGameScreenState extends State<BrickGameScreen>
           ],
         ),
         actions: [
+          // 음소거 — 소리는 곁가지라 언제든 끌 수 있어야 한다
+          IconButton(
+            icon: Icon(_sound.muted ? Icons.volume_off : Icons.volume_up),
+            onPressed: () => setState(() => _sound.muted = !_sound.muted),
+          ),
           // 일시정지 — 멈춰 있는 동안에는 버튼 자체를 감춘다.
           // 화면 아무 곳이나 눌러 푸는 방식이라, 버튼이 남아 있으면
           // 「이 버튼을 다시 눌러야 하나」로 읽힌다.
