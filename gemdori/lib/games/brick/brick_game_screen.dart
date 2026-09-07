@@ -23,6 +23,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 
+import '../../app/dev_mode.dart';
 import 'brick_painter.dart';
 import 'brick_state.dart';
 import 'dev_panel.dart';
@@ -54,10 +55,16 @@ class _BrickGameScreenState extends State<BrickGameScreen>
   /// 주요 로직 : 사건은 `takeEvents()` 로 **한 번 가져가면 비워진다.**
   ///   소리와 로그가 따로 부르면 둘 중 하나만 받게 되므로,
   ///   여기서 한 번 받아 두 곳에 나눠 준다.
+  ///
+  /// 주요 로직 : 패널이 없으면 **쌓지도 않는다** — 아무도 안 보는 목록을
+  ///   매 프레임 채우게 된다. 판단은 `DevPanel` 이 한다.
   final EventLog _log = EventLog();
 
   /// 경기장 크기 단계 (치트). 기본은 상한 그대로라 **평소 동작과 같다**
   FieldPreset _preset = FieldPreset.large;
+
+  /// 지금 패널이 떠 있는가 — build 에서 정해 두고 게임 루프가 읽는다
+  bool _showPanel = false;
 
   @override
   void initState() {
@@ -74,7 +81,7 @@ class _BrickGameScreenState extends State<BrickGameScreen>
     // 사건은 가져가면서 비워진다 — 화면이 매 프레임 한 번만 부른다
     final events = _state.takeEvents();
     _sound.playAll(events);
-    _log.addAll(events);
+    if (_showPanel) _log.addAll(events);
   }
 
   void _movePaddle(Offset localPos) {
@@ -171,19 +178,19 @@ class _BrickGameScreenState extends State<BrickGameScreen>
               _primaryAction();
               return;
             }
-            // 크기 전환 1·2·3 — 패널이 안 뜨는 좁은 화면에서도 되게 키를 남긴다
+            // 크기 전환 1·2·3 — 패널이 안 뜨는 **좁은 화면에서도** 되게 키를 남긴다.
+            // 단 개발 모드일 때만 — 실서비스에서 이용자가 누르면 안 된다
+            if (!devMode) return;
             final p = _presetKeys[e.logicalKey];
             if (p != null) _setPreset(p);
           },
           child: LayoutBuilder(
             builder: (context, constraints) {
               // 패널을 띄울지 **먼저** 정한다 — 게임에 줄 폭이 여기서 갈린다 (2026-09-07).
-              // 폭이 모자라면 패널을 숨기므로 게임이 줄어들 일이 없다.
-              final showPanel =
-                  devPanelEnabled && DevPanel.fitsIn(constraints.maxWidth);
-              final gameWidth = showPanel
-                  ? constraints.maxWidth - (DevPanel.width + DevPanel.gap)
-                  : constraints.maxWidth;
+              // 실서비스 빌드면 visibleIn 이 늘 false 라, 이 아래는 게임만 남는다.
+              final showPanel = DevPanel.visibleIn(constraints.maxWidth);
+              _showPanel = showPanel;
+              final gameWidth = DevPanel.gameWidth(constraints.maxWidth);
 
               // 경기장은 2:3 고정. 남는 공간은 배경색으로 비운다 (2026-09-07 재조정).
               // 입력 좌표가 경기장 기준이 되도록 SizedBox **안쪽**에 붙인다.
@@ -371,6 +378,9 @@ class _BrickGameScreenState extends State<BrickGameScreen>
   //
   //  상세 설명 : 각 상황을 손으로 만들려면 한 판을 다 해야 해서 확인이 느리다.
   //    버튼으로 바로 이동한다. 목숨·점수 정합성은 따지지 않는다.
+  //
+  //  ⛔ **개발 전용.** 지우지 않아도 실서비스 빌드에서는 부르는 곳이 없어진다
+  //     (패널이 통째로 빠지고, 숫자키도 devMode 에서 막힌다).
   //
   //  주요 로직 : 실행 뒤 **초점을 게임으로 되돌린다.** 안 되돌리면 버튼을
   //    한 번 누른 순간부터 스페이스·숫자키가 버튼으로 가서 게임에 안 들어온다.

@@ -2,9 +2,13 @@
 //  dev_panel.dart — 개발자 패널 (넓은 화면에서만)
 // ═══════════════════════════════════════════════════════════════════
 //
-//  주요 기능 : 게임 오른쪽에 상태 값과 최근 사건을 띄운다.
+//  주요 기능 : 게임 오른쪽에 상태 값·최근 사건·치트를 띄운다.
 //              화면이 넓을 때만 나오고, 좁으면 게임만 남는다
-//  제외 사항 : 게임 규칙·계산 (전부 BrickState)
+//  제외 사항 : 게임 규칙·계산 (전부 BrickState) · 켜고 끄는 판단 (app/dev_mode.dart)
+//
+//  ⛔ 이 파일은 **개발 전용이다.** 실서비스 빌드에는 통째로 들어가지 않는다.
+//     구조 : 화면은 `DevPanel.visibleIn()` · `DevPanel.gameWidth()` 두 개만 묻고,
+//     그 안에서 `devMode` 를 본다 — 화면 코드에는 개발용 분기가 남지 않는다.
 //
 //  상세 설명 : 목적은 디버깅보다 **개발 과정을 보여주는 것**이다.
 //    결과물만 보면 「벽돌깨기 하나」지만, 상태를 한 곳에서 관리하고
@@ -28,16 +32,10 @@
 
 import 'package:flutter/material.dart';
 
+import '../../app/dev_mode.dart';
 import 'brick_painter.dart';
 import 'brick_state.dart';
 import 'item.dart';
-
-/// 패널을 켤 것인가.
-///
-/// 주요 로직 : 지금은 항상 켜 두되 **스위치 자리만** 만들어 둔다 (2026-09-07).
-///   배포 때 `kDebugMode` 로 바꾸면 한 줄로 꺼진다 — 끄는 자리를 화면 코드
-///   여기저기서 찾아다니지 않게 하려는 것.
-const bool devPanelEnabled = true;
 
 /// 최근 사건 목록. 화면이 들고 있고 패널이 읽기만 한다.
 ///
@@ -117,13 +115,25 @@ class DevPanel extends StatelessWidget {
   /// 게임과의 사이 여백
   static const double gap = 12;
 
-  /// 이 폭이면 패널을 띄워도 되는가.
+  /// 이 폭이면 패널을 띄울 만한가 (개발 모드인지는 보지 않는다).
   ///
   /// 주요 로직 : 기준은 **패널을 뺀 나머지가 경기장 가로 상한을 감당하는가** 다.
   ///   「몇 인치 이상」이 아니라 이 한 줄이 판별의 전부다.
   ///   대략 660px 부터 뜨고, 폰 세로(360~430)는 자동으로 게임만 남는다.
   static bool fitsIn(double totalWidth) =>
       totalWidth - (width + gap) >= BrickState.maxFieldWidth;
+
+  /// **화면이 물어보는 곳 ①** — 지금 이 폭에서 패널을 띄우는가.
+  ///
+  /// 주요 로직 : 「개발 모드인가」와 「폭이 남는가」를 **여기서 한 번에** 판단한다.
+  ///   화면 쪽에 `devMode` 를 노출하지 않으려는 것 — 분기가 화면마다 흩어지면
+  ///   실서비스로 넘길 때 한쪽만 꺼진 채로 나간다.
+  static bool visibleIn(double totalWidth) => devMode && fitsIn(totalWidth);
+
+  /// **화면이 물어보는 곳 ②** — 게임에 줄 폭.
+  /// 패널을 안 띄우면 전체 폭을 그대로 돌려준다 — 게임이 줄어들 일이 없다.
+  static double gameWidth(double totalWidth) =>
+      visibleIn(totalWidth) ? totalWidth - (width + gap) : totalWidth;
 
   static const Color _bg = Color(0xFF11161D);
   static const Color _dim = Color(0xFF7A8699);

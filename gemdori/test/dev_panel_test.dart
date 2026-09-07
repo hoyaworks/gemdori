@@ -6,6 +6,7 @@
 import 'dart:ui';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:gemdori/app/dev_mode.dart';
 import 'package:gemdori/games/brick/brick_state.dart';
 import 'package:gemdori/games/brick/dev_panel.dart';
 
@@ -31,6 +32,26 @@ void main() {
       final rest = 1366 - (DevPanel.width + DevPanel.gap);
       final size = BrickState.fitField(Size(rest, 900));
       expect(size.height, BrickState.maxFieldHeight);
+    });
+  });
+
+  group('개발 모드 — 실서비스 전환', () {
+    test('테스트는 릴리스 빌드가 아니므로 켜져 있다', () {
+      expect(devMode, isTrue);
+    });
+
+    test('표시 판별에 devMode 가 들어간다 — 화면 쪽에 분기를 두지 않는다', () {
+      // 릴리스 빌드에서는 devMode 가 false 라 폭과 무관하게 안 뜬다
+      expect(DevPanel.visibleIn(1366), devMode);
+      expect(DevPanel.visibleIn(360), isFalse); // 폭이 모자라면 개발 모드여도 안 뜸
+    });
+
+    test('패널이 안 뜨면 게임이 전체 폭을 그대로 쓴다', () {
+      expect(DevPanel.gameWidth(360), 360); // 좁아서 안 뜨는 경우
+      expect(
+        DevPanel.gameWidth(1366),
+        devMode ? 1366 - (DevPanel.width + DevPanel.gap) : 1366,
+      );
     });
   });
 
@@ -70,6 +91,23 @@ void main() {
             maxHeight: BrickState.presetHeight(p));
         final st = BrickState(fieldSize: size);
         expect(st.basePaddleWidth / size.width, closeTo(0.15, 1e-9));
+      }
+    });
+  });
+
+  group('크기가 바뀌어도 난이도는 그대로', () {
+    // 공 크기는 **고정이 아니라 폭에 비례한다** — 확인 결과 지금 값이 좋다는 판정
+    // (2026-09-07). 고정으로 바꾸면 작은 화면에서 공만 커져 난이도가 흔들린다.
+    test('공 반지름이 경기장 폭에서 차지하는 비율이 단계와 무관하다', () {
+      double ratio(FieldPreset p) {
+        final size = BrickState.fitField(const Size(2000, 2000),
+            maxHeight: BrickState.presetHeight(p));
+        return BrickState(fieldSize: size).ballRadius / size.width;
+      }
+
+      final base = ratio(FieldPreset.large);
+      for (final p in FieldPreset.values) {
+        expect(ratio(p), closeTo(base, 1e-9));
       }
     });
   });
