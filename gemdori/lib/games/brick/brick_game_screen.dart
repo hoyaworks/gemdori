@@ -142,8 +142,10 @@ class _BrickGameScreenState extends State<BrickGameScreen>
           ),
         ],
       ),
-      bottomNavigationBar: _cheatBar(),
-      body: Padding(
+      bottomNavigationBar: SafeArea(child: _cheatBar()),
+      // SafeArea — 안드로이드 하단 버튼·노치에 경기장이 가리지 않게 (2026-09-07)
+      body: SafeArea(
+        child: Padding(
         padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
         child: KeyboardListener(
           focusNode: _focusNode,
@@ -193,6 +195,7 @@ class _BrickGameScreenState extends State<BrickGameScreen>
                 ),
               );
             },
+            ),
           ),
         ),
       ),

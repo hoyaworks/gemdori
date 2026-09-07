@@ -36,6 +36,7 @@ BrickState playing({
 }) =>
     BrickState(
       fieldSize: const Size(400, 600),
+      refWidth: 400, // 테스트는 배율 1 로 고정한다
       status: GameStatus.playing,
       ballPos: ballPos,
       ballVelocity: ballVelocity,
@@ -60,6 +61,7 @@ void main() {
   fieldAspectTests();
   overlapStartTests();
   gameEventTests();
+  sizeScaleTests();
 }
 
 void ballTests() {
@@ -339,7 +341,7 @@ void brickTests() {
 void progressTests() {
   group('진행', () {
     test('처음에는 대기 상태이고 공이 패들 위에 얹혀 있다', () {
-      final s = BrickState(fieldSize: const Size(400, 600));
+      final s = BrickState(fieldSize: const Size(400, 600), refWidth: 400);
       expect(s.status, GameStatus.ready);
       expect(s.ballVelocity, Offset.zero);
       expect(s.ballPos.dx, s.paddleX);
@@ -348,13 +350,13 @@ void progressTests() {
     });
 
     test('대기 중에는 패들을 따라 공도 움직인다', () {
-      final s = BrickState(fieldSize: const Size(400, 600));
+      final s = BrickState(fieldSize: const Size(400, 600), refWidth: 400);
       s.movePaddleTo(120);
       expect(s.ballPos.dx, 120);
     });
 
     test('대기 중에는 시간이 흘러도 공이 움직이지 않는다', () {
-      final s = BrickState(fieldSize: const Size(400, 600));
+      final s = BrickState(fieldSize: const Size(400, 600), refWidth: 400);
       final before = s.ballPos;
       s.update(1);
       expect(s.ballPos, before);
@@ -448,7 +450,7 @@ void progressTests() {
 
     test('스테이지는 11개이고 11이 마지막이다', () {
       expect(BrickState.stages.length, 11);
-      final s = BrickState(fieldSize: const Size(400, 600));
+      final s = BrickState(fieldSize: const Size(400, 600), refWidth: 400);
       expect(s.isLastStage, isFalse);
       s.loadStage(11);
       expect(s.isLastStage, isTrue);
@@ -460,7 +462,7 @@ void progressTests() {
 void finishedTests() {
   group('끝난 뒤', () {
     test('게임오버와 클리어 모두 isFinished 가 참이다', () {
-      final s = BrickState(fieldSize: const Size(400, 600));
+      final s = BrickState(fieldSize: const Size(400, 600), refWidth: 400);
       s.status = GameStatus.gameOver;
       expect(s.isFinished, isTrue);
       s.status = GameStatus.cleared;
@@ -472,7 +474,7 @@ void finishedTests() {
     });
 
     test('끝난 뒤에는 패들이 움직이지 않는다', () {
-      final s = BrickState(fieldSize: const Size(400, 600));
+      final s = BrickState(fieldSize: const Size(400, 600), refWidth: 400);
       final before = s.paddleX;
       s.status = GameStatus.gameOver;
       s.movePaddleTo(50);
@@ -484,7 +486,7 @@ void finishedTests() {
     });
 
     test('다시 시작하면 다시 움직인다', () {
-      final s = BrickState(fieldSize: const Size(400, 600));
+      final s = BrickState(fieldSize: const Size(400, 600), refWidth: 400);
       s.status = GameStatus.gameOver;
       s.restart();
       s.movePaddleTo(150);
@@ -540,7 +542,7 @@ void stageTests() {
     });
 
     test('스테이지가 오르면 실제 발사 속도도 오른다', () {
-      final s = BrickState(fieldSize: const Size(400, 600));
+      final s = BrickState(fieldSize: const Size(400, 600), refWidth: 400);
       expect(s.ballSpeed, 300);
       s.loadStage(4);
       expect(s.ballSpeed, 390);
@@ -549,7 +551,7 @@ void stageTests() {
     });
 
     test('스테이지가 넘어갈 때는 값만 바뀌고 깜빡이지 않는다', () {
-      final s = BrickState(fieldSize: const Size(400, 600));
+      final s = BrickState(fieldSize: const Size(400, 600), refWidth: 400);
       s.loadStage(2); // 2 → 3 에서 기본 단계가 달라진다
       expect(s.speedMark, BrickState.speedMarks[1]);
 
@@ -566,7 +568,7 @@ void stageTests() {
     });
 
     test('스테이지 2 는 가운데 줄만 내구도 2', () {
-      final s = BrickState(fieldSize: const Size(400, 600));
+      final s = BrickState(fieldSize: const Size(400, 600), refWidth: 400);
       s.loadStage(2);
       expect(s.bricks.where((b) => b.row == 0).every((b) => b.hp == 1), isTrue);
       expect(s.bricks.where((b) => b.row == 1).every((b) => b.hp == 2), isTrue);
@@ -597,7 +599,7 @@ void stageTests() {
     });
 
     test('치트 — 스테이지 이동은 범위를 벗어나지 않는다', () {
-      final s = BrickState(fieldSize: const Size(400, 600));
+      final s = BrickState(fieldSize: const Size(400, 600), refWidth: 400);
       s.debugGoToStage(99);
       expect(s.stage, BrickState.stages.length);
       s.debugGoToStage(0);
@@ -605,7 +607,7 @@ void stageTests() {
     });
 
     test('치트 — 게임오버로 바로 간다', () {
-      final s = BrickState(fieldSize: const Size(400, 600));
+      final s = BrickState(fieldSize: const Size(400, 600), refWidth: 400);
       s.debugGameOver();
       expect(s.status, GameStatus.gameOver);
       expect(s.isFinished, isTrue);
@@ -697,7 +699,7 @@ void wallHugTests() {
 void gapTests() {
   group('벽돌 사이', () {
     test('틈은 공 지름보다 좁다 — 공이 낄 수 없다', () {
-      final s = BrickState(fieldSize: const Size(400, 600));
+      final s = BrickState(fieldSize: const Size(400, 600), refWidth: 400);
       expect(s.brickGap, lessThan(s.ballRadius * 2));
     });
 
@@ -767,7 +769,7 @@ void gapTests() {
 void sampleStageTests() {
   group('샘플 스테이지', () {
     test('파랑 5줄(35칸)이고 샘플로 표시된다', () {
-      final s = BrickState(fieldSize: const Size(400, 600));
+      final s = BrickState(fieldSize: const Size(400, 600), refWidth: 400);
       s.debugLoadSampleStage();
       expect(s.isSampleStage, isTrue);
       expect(s.brickRows, 5);
@@ -777,7 +779,7 @@ void sampleStageTests() {
     });
 
     test('무적공만 빠지고 나머지가 2개씩 들어간다', () {
-      final s = BrickState(fieldSize: const Size(400, 600));
+      final s = BrickState(fieldSize: const Size(400, 600), refWidth: 400);
       s.debugLoadSampleStage();
 
       for (final t in BrickState.sampleExcluded) {
@@ -792,14 +794,14 @@ void sampleStageTests() {
     });
 
     test('샘플의 시작 속도는 단계 1 이다', () {
-      final s = BrickState(fieldSize: const Size(400, 600));
+      final s = BrickState(fieldSize: const Size(400, 600), refWidth: 400);
       s.debugLoadSampleStage();
       expect(s.speedStage, 1);
       expect(s.ballSpeed, 300);
     });
 
     test('다 깨면 CLEARED 로 끝난다 — 실제 스테이지로 넘어가지 않는다', () {
-      final s = BrickState(fieldSize: const Size(400, 600));
+      final s = BrickState(fieldSize: const Size(400, 600), refWidth: 400);
       s.debugLoadSampleStage();
       s.debugClearStage();
       expect(s.status, GameStatus.cleared);
@@ -807,7 +809,7 @@ void sampleStageTests() {
     });
 
     test('클리어 후 다시 시작하면 샘플이 다시 깔린다', () {
-      final s = BrickState(fieldSize: const Size(400, 600));
+      final s = BrickState(fieldSize: const Size(400, 600), refWidth: 400);
       s.debugLoadSampleStage();
       s.debugClearStage();
       s.restart();
@@ -819,7 +821,7 @@ void sampleStageTests() {
     });
 
     test('게임오버 후 다시 시작해도 샘플이다', () {
-      final s = BrickState(fieldSize: const Size(400, 600));
+      final s = BrickState(fieldSize: const Size(400, 600), refWidth: 400);
       s.debugLoadSampleStage();
       s.debugGameOver();
       s.restart();
@@ -828,7 +830,7 @@ void sampleStageTests() {
     });
 
     test('실제 스테이지에서 다시 시작하면 스테이지 1 이다', () {
-      final s = BrickState(fieldSize: const Size(400, 600));
+      final s = BrickState(fieldSize: const Size(400, 600), refWidth: 400);
       s.debugGoToStage(5);
       s.restart();
       expect(s.stage, 1);
@@ -836,7 +838,7 @@ void sampleStageTests() {
     });
 
     test('실제 스테이지 번호와 섞이지 않는다', () {
-      final s = BrickState(fieldSize: const Size(400, 600));
+      final s = BrickState(fieldSize: const Size(400, 600), refWidth: 400);
       s.debugLoadSampleStage();
       expect(s.stage, BrickState.sampleStage);
       s.debugGoToStage(1);
@@ -849,7 +851,7 @@ void sampleStageTests() {
 void multiBallTests() {
   group('멀티볼', () {
     test('평소에는 공이 1개다', () {
-      final s = BrickState(fieldSize: const Size(400, 600));
+      final s = BrickState(fieldSize: const Size(400, 600), refWidth: 400);
       expect(s.balls.length, 1);
       expect(s.ballPos, s.balls.first.pos);
     });
@@ -940,6 +942,7 @@ void multiBallTests() {
     test('왼쪽 벽 — 넘어간 만큼 되꺾인다', () {
       final s = BrickState(
         fieldSize: const Size(400, 600),
+        refWidth: 400, // 테스트는 배율 1 로 고정한다
         ballPos: const Offset(11, 300),
         ballVelocity: const Offset(-300, 0),
         status: GameStatus.playing,
@@ -955,7 +958,7 @@ void multiBallTests() {
     });
 
     test('벽돌 — 파고든 만큼 되꺾인다', () {
-      final s = BrickState(fieldSize: const Size(400, 600), stage: 1);
+      final s = BrickState(fieldSize: const Size(400, 600), refWidth: 400, stage: 1);
       s.status = GameStatus.playing;
 
       final target = s.bricks.firstWhere((b) => b.col == 3 && b.row == 2);
@@ -972,7 +975,7 @@ void multiBallTests() {
     });
 
     test('패들 — 남은 거리를 새 방향으로 마저 간다', () {
-      final s = BrickState(fieldSize: const Size(400, 600), stage: 1);
+      final s = BrickState(fieldSize: const Size(400, 600), refWidth: 400, stage: 1);
       s.status = GameStatus.playing;
 
       final face = s.paddleTop - s.ballRadius;
@@ -988,7 +991,7 @@ void multiBallTests() {
     });
 
     test('속력은 어디에 맞아도 그대로다', () {
-      final s = BrickState(fieldSize: const Size(400, 600), stage: 1);
+      final s = BrickState(fieldSize: const Size(400, 600), refWidth: 400, stage: 1);
       s.status = GameStatus.playing;
       s.ballPos = const Offset(30, 300);
       s.ballVelocity = Offset(-s.ballSpeed * 0.6, -s.ballSpeed * 0.8);
@@ -1132,7 +1135,7 @@ void fieldAspectTests() {
 void overlapStartTests() {
   group('겹친 채 시작한 충돌', () {
     test('벽돌 위로 순간이동하지 않는다', () {
-      final s = BrickState(fieldSize: const Size(400, 600), stage: 1);
+      final s = BrickState(fieldSize: const Size(400, 600), refWidth: 400, stage: 1);
       s.status = GameStatus.playing;
       final b = s.bricks.firstWhere((b) => b.row == 1 && b.col == 3);
       final rect = s.brickRect(b);
@@ -1148,7 +1151,7 @@ void overlapStartTests() {
     });
 
     test('위로 가던 중이면 아랫면으로 내보낸다', () {
-      final s = BrickState(fieldSize: const Size(400, 600), stage: 1);
+      final s = BrickState(fieldSize: const Size(400, 600), refWidth: 400, stage: 1);
       s.status = GameStatus.playing;
       final b = s.bricks.firstWhere((b) => b.row == 1 && b.col == 3);
       final rect = s.brickRect(b);
@@ -1173,7 +1176,7 @@ void overlapStartTests() {
 void gameEventTests() {
   group('사건 기록', () {
     test('가져가면 비워진다', () {
-      final s = BrickState(fieldSize: const Size(400, 600));
+      final s = BrickState(fieldSize: const Size(400, 600), refWidth: 400);
       s.launch();
       expect(s.takeEvents().map((e) => e.type), [GameEventType.launch]);
       expect(s.takeEvents(), isEmpty, reason: '두 번 읽히지 않는다');
@@ -1202,7 +1205,7 @@ void gameEventTests() {
     });
 
     test('벽돌은 맞음과 깨짐을 구분하고 색을 함께 남긴다', () {
-      final s = BrickState(fieldSize: const Size(400, 600), stage: 3);
+      final s = BrickState(fieldSize: const Size(400, 600), refWidth: 400, stage: 3);
       s.status = GameStatus.playing;
       // 빨강(hp 3) 줄을 골라 세 번 맞힌다
       final b = s.bricks.firstWhere((b) => b.hp == 3);
@@ -1230,7 +1233,7 @@ void gameEventTests() {
     });
 
     test('아이템은 도움과 방해를 구분한다', () {
-      final s = BrickState(fieldSize: const Size(400, 600));
+      final s = BrickState(fieldSize: const Size(400, 600), refWidth: 400);
       s.applyItem(ItemType.paddleGrow);
       s.applyItem(ItemType.paddleShrink);
       expect(s.takeEvents().map((e) => e.type),
@@ -1247,6 +1250,56 @@ void gameEventTests() {
       }
       expect(s.takeEvents().map((e) => e.type),
           contains(GameEventType.ballLost));
+    });
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  크기 비례 (2026-09-07)
+// ═══════════════════════════════════════════════════════════════════
+//
+//  주요 로직 : 크기가 고정 픽셀이면 **화면이 클수록 어려워진다**.
+//    패들이 상대적으로 작아지기 때문이다. 폭에 비례시켜 그 흔들림을 없앤다.
+void sizeScaleTests() {
+  group('크기 비례', () {
+    test('기준 폭에서는 값이 그대로다', () {
+      final s = BrickState(
+        fieldSize: const Size(BrickState.defaultRefWidth, 800),
+      );
+      expect(s.scale, 1);
+      expect(s.ballRadius, 8);
+      expect(s.basePaddleWidth, 90);
+      expect(s.brickHeight, 20);
+    });
+
+    test('폭이 두 배면 모든 크기가 두 배', () {
+      final s = BrickState(
+        fieldSize: const Size(BrickState.defaultRefWidth * 2, 1600),
+      );
+      expect(s.scale, 2);
+      expect(s.ballRadius, 16);
+      expect(s.basePaddleWidth, 180);
+      expect(s.brickHeight, 40);
+      expect(s.itemRadius, 18);
+    });
+
+    test('⭐ 패들이 차지하는 비율은 화면 크기와 무관하게 같다', () {
+      double ratio(double w) {
+        final s = BrickState(fieldSize: Size(w, w / BrickState.fieldAspect));
+        return s.basePaddleWidth / s.fieldSize.width;
+      }
+
+      final small = ratio(360);
+      final big = ratio(1200);
+      expect(small, closeTo(big, 0.0001),
+          reason: '이 값이 흔들리면 기기가 난이도를 바꾼다');
+    });
+
+    test('배율이 바뀌어도 패들 아이템 배수는 그대로', () {
+      final s = BrickState(fieldSize: const Size(1200, 1600));
+      final base = s.basePaddleWidth;
+      s.applyItem(ItemType.paddleGrow);
+      expect(s.paddleWidth, base * 2);
     });
   });
 }

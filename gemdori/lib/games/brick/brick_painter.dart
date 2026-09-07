@@ -102,13 +102,14 @@ class BrickPainter extends CustomPainter {
       //   의도한 것은 아니었으나 기호가 벽돌 위에 얹힌 **입체감**으로 읽혀 더 낫다.
       //   「테두리가 끊긴다」를 결함으로 보고 고치지 말 것.
       if (b.item != null) {
-        canvas.drawCircle(rect.center, 9, Paint()..color = const Color(0xFF12161C));
-        drawItemMark(canvas, rect.center, b.item!, 6);
+        canvas.drawCircle(rect.center, state.brickMarkRadius * 1.5,
+            Paint()..color = const Color(0xFF12161C));
+        drawItemMark(canvas, rect.center, b.item!, state.brickMarkRadius);
       }
     }
 
     for (final it in state.fallingItems) {
-      drawItemMark(canvas, it.pos, it.type, FallingItem.radius);
+      drawItemMark(canvas, it.pos, it.type, state.itemRadius);
     }
 
     // 끝난 뒤에는 패들과 공을 지운다 — 남은 벽돌만 결과로 보여 준다

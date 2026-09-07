@@ -20,6 +20,7 @@ import 'package:gemdori/games/brick/item.dart';
 
 BrickState make({int stage = 1}) => BrickState(
       fieldSize: const Size(400, 600),
+      refWidth: 400, // 테스트는 배율 1 로 고정한다
       random: Random(7),
       stage: stage,
     );

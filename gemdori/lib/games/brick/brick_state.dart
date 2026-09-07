@@ -121,17 +121,26 @@ class BrickState {
     GameStatus status = GameStatus.ready,
     Offset? ballPos,
     Offset? ballVelocity,
-    this.ballRadius = 8,
-    this.basePaddleWidth = 90,
-    this.paddleHeight = 12,
-    this.paddleBottomMargin = 24,
+    double ballRadius = 8,
+    double basePaddleWidth = 90,
+    double paddleHeight = 12,
+    double paddleBottomMargin = 24,
     double? paddleX,
     this.brickCols = 7,
-    this.brickTopMargin = 56,
-    this.brickSideMargin = 12,
-    this.brickGap = 6,
-    this.brickHeight = 20,
+    double brickTopMargin = 56,
+    double brickSideMargin = 12,
+    double brickGap = 6,
+    double brickHeight = 20,
+    this.refWidth = defaultRefWidth,
   })  : _random = random ?? Random(),
+        _refBallRadius = ballRadius,
+        _refPaddleWidth = basePaddleWidth,
+        _refPaddleHeight = paddleHeight,
+        _refPaddleBottomMargin = paddleBottomMargin,
+        _refBrickTopMargin = brickTopMargin,
+        _refBrickSideMargin = brickSideMargin,
+        _refBrickGap = brickGap,
+        _refBrickHeight = brickHeight,
         paddleX = paddleX ?? fieldSize.width / 2,
         status = GameStatus.ready {
     // loadStage() 가 공 위치와 상태를 기본값으로 맞춘 뒤,
@@ -152,7 +161,37 @@ class BrickState {
   /// 살아 있는 공들. 보통 1개이고, 멀티볼 아이템에서 늘어난다.
   List<Ball> balls = [];
 
-  final double ballRadius;
+  // ── 크기 ─────────────────────────────────────────────────────────
+  //
+  // ⭐ 주요 로직 : 모든 크기는 **경기장 폭에 비례**한다 (2026-09-07).
+  //   예전에는 패들 90px · 공 8px 처럼 고정 픽셀이었다. 그러면 화면이 클수록
+  //   패들이 **상대적으로 작아져 어려워진다** — 공들여 맞춘 난이도를 기기가 흔든다.
+  //   아래 `_ref*` 는 **기준 폭(refWidth)에서의 값**이고, 실제 값은 폭에 맞춰 늘고 준다.
+  //   ⛔ 글자 크기는 예외 — 작아지면 못 읽으므로 화면 쪽에서 고정으로 둔다.
+  static const double defaultRefWidth = 600;
+
+  /// 이 경기장의 기준 폭. 테스트는 계산을 고정하려고 실제 폭과 같게 준다
+  final double refWidth;
+
+  /// 기준 폭 대비 배율
+  double get scale => fieldSize.width / refWidth;
+
+  final double _refBallRadius;
+  final double _refPaddleWidth;
+  final double _refPaddleHeight;
+  final double _refPaddleBottomMargin;
+  final double _refBrickTopMargin;
+  final double _refBrickSideMargin;
+  final double _refBrickGap;
+  final double _refBrickHeight;
+
+  double get ballRadius => _refBallRadius * scale;
+
+  /// 떨어지는 아이템 반지름
+  double get itemRadius => 9 * scale;
+
+  /// 벽돌 위에 그리는 아이템 기호 반지름
+  double get brickMarkRadius => 6 * scale;
 
   /// 공이 하나일 때를 위한 지름길 — 대부분의 규칙과 테스트가 공 1개를 다룬다.
   /// 공이 여러 개면 첫 번째 공을 가리킨다.
@@ -176,7 +215,7 @@ class BrickState {
   }
 
   /// 아이템이 없을 때의 패들 폭
-  final double basePaddleWidth;
+  double get basePaddleWidth => _refPaddleWidth * scale;
 
   /// 실제 패들 폭 — 확대 2배 / 축소 1/2
   double get paddleWidth {
@@ -185,19 +224,19 @@ class BrickState {
     return basePaddleWidth;
   }
 
-  final double paddleHeight;
+  double get paddleHeight => _refPaddleHeight * scale;
 
   /// 바닥에서 패들까지 띄우는 간격
-  final double paddleBottomMargin;
+  double get paddleBottomMargin => _refPaddleBottomMargin * scale;
 
   /// 패들 중심 x 좌표
   double paddleX;
 
   final int brickCols;
-  final double brickTopMargin;
-  final double brickSideMargin;
-  final double brickGap;
-  final double brickHeight;
+  double get brickTopMargin => _refBrickTopMargin * scale;
+  double get brickSideMargin => _refBrickSideMargin * scale;
+  double get brickGap => _refBrickGap * scale;
+  double get brickHeight => _refBrickHeight * scale;
 
   /// 벽돌 목록. 깨진 것(hp = 0)도 목록에는 남겨 둔다.
   List<Brick> bricks = [];
@@ -1017,7 +1056,7 @@ class BrickState {
     final caught = <FallingItem>[];
     for (final it in fallingItems) {
       it.pos = Offset(it.pos.dx, it.pos.dy + it.speed * dt);
-      if (_circleHitsRect(it.pos, paddleRect, FallingItem.radius)) {
+      if (_circleHitsRect(it.pos, paddleRect, itemRadius)) {
         caught.add(it);
       }
     }
@@ -1025,7 +1064,7 @@ class BrickState {
       applyItem(it.type);
     }
     fallingItems.removeWhere(
-      (it) => caught.contains(it) || it.pos.dy - FallingItem.radius > fieldSize.height,
+      (it) => caught.contains(it) || it.pos.dy - itemRadius > fieldSize.height,
     );
   }
 
