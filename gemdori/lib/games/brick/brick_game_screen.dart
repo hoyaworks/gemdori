@@ -25,6 +25,7 @@ import 'package:flutter/services.dart';
 
 import 'brick_painter.dart';
 import 'brick_state.dart';
+import 'dev_panel.dart';
 import 'sound.dart';
 
 class BrickGameScreen extends StatefulWidget {
@@ -48,6 +49,13 @@ class _BrickGameScreenState extends State<BrickGameScreen>
   /// 효과음. 상태가 남긴 사건을 매 프레임 가져가 재생한다
   final GameSound _sound = GameSound();
 
+  /// 개발자 패널에 띄울 최근 사건.
+  ///
+  /// 주요 로직 : 사건은 `takeEvents()` 로 **한 번 가져가면 비워진다.**
+  ///   소리와 로그가 따로 부르면 둘 중 하나만 받게 되므로,
+  ///   여기서 한 번 받아 두 곳에 나눠 준다.
+  final EventLog _log = EventLog();
+
   @override
   void initState() {
     super.initState();
@@ -61,7 +69,9 @@ class _BrickGameScreenState extends State<BrickGameScreen>
     final step = dt.clamp(0.0, 1 / 30);
     setState(() => _state.update(step));
     // 사건은 가져가면서 비워진다 — 화면이 매 프레임 한 번만 부른다
-    _sound.playAll(_state.takeEvents());
+    final events = _state.takeEvents();
+    _sound.playAll(events);
+    _log.addAll(events);
   }
 
   void _movePaddle(Offset localPos) {
@@ -159,15 +169,23 @@ class _BrickGameScreenState extends State<BrickGameScreen>
           },
           child: LayoutBuilder(
             builder: (context, constraints) {
-              // 경기장은 9:16 고정. 남는 공간은 배경색으로 비운다 (2026-09-04).
+              // 패널을 띄울지 **먼저** 정한다 — 게임에 줄 폭이 여기서 갈린다 (2026-09-07).
+              // 폭이 모자라면 패널을 숨기므로 게임이 줄어들 일이 없다.
+              final showPanel =
+                  devPanelEnabled && DevPanel.fitsIn(constraints.maxWidth);
+              final gameWidth = showPanel
+                  ? constraints.maxWidth - (DevPanel.width + DevPanel.gap)
+                  : constraints.maxWidth;
+
+              // 경기장은 2:3 고정. 남는 공간은 배경색으로 비운다 (2026-09-07 재조정).
               // 입력 좌표가 경기장 기준이 되도록 SizedBox **안쪽**에 붙인다.
               final size = BrickState.fitField(
-                Size(constraints.maxWidth, constraints.maxHeight),
+                Size(gameWidth, constraints.maxHeight),
               );
               if (size != _state.fieldSize) {
                 _state.resize(size);
               }
-              return Center(
+              final field = Center(
                 child: SizedBox(
                   width: size.width,
                   height: size.height,
@@ -195,6 +213,16 @@ class _BrickGameScreenState extends State<BrickGameScreen>
                     ),
                   ),
                 ),
+              );
+              if (!showPanel) return field;
+              // stretch — 패널이 세로를 꽉 채워야 안쪽 로그 목록이 높이를 갖는다
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(child: field),
+                  const SizedBox(width: DevPanel.gap),
+                  DevPanel(state: _state, log: _log),
+                ],
               );
             },
             ),
