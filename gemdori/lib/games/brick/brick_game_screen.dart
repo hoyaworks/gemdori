@@ -97,6 +97,8 @@ class _BrickGameScreenState extends State<BrickGameScreen>
     return Scaffold(
       backgroundColor: const Color(0xFF0B0E13),
       appBar: AppBar(
+        // 상단 바를 낮춰 경기장 세로를 벌었다 (2026-09-07). 기본 56 → 44
+        toolbarHeight: 44,
         title: Row(
           children: [
             for (var i = 0; i < BrickState.maxLives; i++)
