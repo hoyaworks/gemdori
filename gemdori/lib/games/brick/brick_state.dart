@@ -680,7 +680,13 @@ class BrickState {
   List<int> get _rowHp => spec.rowHp;
 
   /// 현재 공 속도 (초당 픽셀)
-  double get ballSpeed => speedTable[speedStage].toDouble();
+  /// 공 속력(초당 픽셀) — **경기장 폭에 비례**한다 (2026-09-07 수정).
+  ///
+  /// 주요 로직 : 속도만 고정 픽셀로 두면 크기를 비례시킨 의미가 없어진다.
+  ///   화면이 커지면 건너야 할 거리는 늘어나는데 속력은 그대로라 **느려진 것처럼** 느껴지고,
+  ///   작은 폰에서는 반대로 빨라진다. **기기가 난이도를 바꾸는** 마지막 구멍이었다.
+  ///   `speedTable` 의 값은 이제 **기준 폭에서의 px/s** 로 읽는다.
+  double get ballSpeed => speedTable[speedStage] * scale;
 
   /// 이 스테이지가 정한 기본 속도 단계
   int get baseSpeedStage => spec.speedLevel;
@@ -972,6 +978,9 @@ class BrickState {
   /// 화면 크기가 바뀌면 공과 패들을 경기장 안으로 다시 넣는다.
   void resize(Size size) {
     fieldSize = size;
+    // 크기가 바뀌면 배율이 바뀌므로 날아가던 공의 속력도 다시 맞춘다.
+    // 안 맞추면 창을 키운 순간 그 공만 예전 속력으로 남아 느리게 보인다.
+    _resyncBallSpeed();
     // movePaddleTo 를 쓰면 좌우 반전 효과가 걸린 동안 위치가 뒤집혀 버린다
     _clampPaddle();
     if (status == GameStatus.ready) {
@@ -1055,7 +1064,8 @@ class BrickState {
     if (fallingItems.isEmpty) return;
     final caught = <FallingItem>[];
     for (final it in fallingItems) {
-      it.pos = Offset(it.pos.dx, it.pos.dy + it.speed * dt);
+      // 낙하 속도도 폭에 비례시킨다 — 안 그러면 큰 화면에서만 아이템이 느리게 떨어진다
+      it.pos = Offset(it.pos.dx, it.pos.dy + it.speed * scale * dt);
       if (_circleHitsRect(it.pos, paddleRect, itemRadius)) {
         caught.add(it);
       }

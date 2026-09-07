@@ -1295,6 +1295,32 @@ void sizeScaleTests() {
           reason: '이 값이 흔들리면 기기가 난이도를 바꾼다');
     });
 
+    // ⭐ 2026-09-07 — 크기만 비례시키고 속도를 두면 기기가 난이도를 바꾼다.
+    //   화면이 크면 건널 거리는 느는데 속력이 그대로라 느려진 것처럼 느껴진다.
+    test('공이 경기장을 건너는 데 걸리는 시간은 화면 크기와 무관하다', () {
+      double crossSeconds(double w) {
+        final s = BrickState(fieldSize: Size(w, w / BrickState.fieldAspect));
+        return s.fieldSize.height / s.ballSpeed;
+      }
+
+      expect(crossSeconds(360), closeTo(crossSeconds(1200), 0.0001),
+          reason: '이 값이 흔들리면 폰마다 체감 속도가 달라진다');
+    });
+
+    test('창 크기가 바뀌면 날아가던 공의 속력도 새 배율에 맞춰진다', () {
+      final s = BrickState(
+        fieldSize: const Size(600, 800),
+        status: GameStatus.playing,
+        ballVelocity: const Offset(0, -300),
+      );
+      expect(s.ballVelocity.distance, closeTo(s.ballSpeed, 0.001));
+
+      s.resize(const Size(1200, 1600));
+      expect(s.ballVelocity.distance, closeTo(s.ballSpeed, 0.001),
+          reason: '안 맞추면 그 공만 예전 속력으로 남는다');
+      expect(s.ballVelocity.dy, lessThan(0), reason: '방향은 그대로');
+    });
+
     test('배율이 바뀌어도 패들 아이템 배수는 그대로', () {
       final s = BrickState(fieldSize: const Size(1200, 1600));
       final base = s.basePaddleWidth;
