@@ -36,11 +36,13 @@ import 'brick_state.dart';
 /// 사건 종류가 아니라 갈래로 묶어야, 번갈아 나는 충돌음이 서로를 막지 않는다.
 enum _Ch { hit, brickHit, ballLost, item, launch }
 
-/// 부딪힐 때 번갈아 나는 두 소리 — 딩 · 동
+/// 부딪힐 때 번갈아 나는 두 소리 — **딩(paddle) → 동(wall) 순서로 시작**
 ///
 /// 주요 로직 : 두 소리의 볼륨을 **같게** 둔다. 한쪽만 크면 번갈이가 아니라
 ///   「큰 소리 뒤에 작은 소리」로 들려서 리듬이 깨진다.
-const List<String> _hitPair = ['audio/paddle.wav', 'audio/wall.wav'];
+const String _sfxDing = 'audio/paddle.wav';
+const String _sfxDong = 'audio/wall.wav';
+const List<String> _hitPair = [_sfxDing, _sfxDong];
 const double _hitVolume = 0.38;
 
 /// 갈래별 최소 간격(밀리초)
@@ -60,7 +62,10 @@ const Map<GameEventType, (String, double, _Ch)> _solo = {
   GameEventType.ballLost: ('audio/ball_lost.wav', 0.90, _Ch.ballLost),
   GameEventType.itemHelp: ('audio/item_help.wav', 0.70, _Ch.item),
   GameEventType.itemHarm: ('audio/item_harm.wav', 0.70, _Ch.item),
-  GameEventType.launch: ('audio/launch.wav', 0.50, _Ch.launch),
+
+  // 발사 — **번갈이 첫 소리(딩)와 같은 파일**을 쓴다 (2026-09-07).
+  //   발사가 리듬의 첫 박이 되어 「딩(발사) – 동 – 딩 – 동」으로 이어진다.
+  GameEventType.launch: (_sfxDing, _hitVolume, _Ch.launch),
 };
 
 /// 번갈이 소리로 처리하는 사건 — 벽 · 패들 · 벽돌 깨짐
@@ -136,6 +141,10 @@ class GameSound {
     // 실제로 소리를 낸 경우에만 차례를 넘긴다.
     // 버려진 소리에서 넘기면 같은 소리가 연달아 나 번갈이가 깨진다.
     if (ch == _Ch.hit) _alt = 1 - _alt;
+
+    // 발사음이 곧 첫 박(딩)이므로, 다음 충돌은 동(wall)부터 시작한다.
+    // 이렇게 해야 발사 직후 같은 소리가 두 번 겹치지 않는다.
+    if (ch == _Ch.launch) _alt = 1;
 
     final player = _pool[_next];
     _next = (_next + 1) % _pool.length;
