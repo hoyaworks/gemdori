@@ -334,6 +334,16 @@ class _BrickGameScreenState extends State<BrickGameScreen>
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
+            // 테스트용 — 경기장 크기와 배율. 창을 움직일 때 값이 바뀌는지 눈으로 본다
+            SizedBox(
+              width: 108,
+              child: Text(
+                '${_state.fieldSize.width.round()}×${_state.fieldSize.height.round()}'
+                '  ×${_state.scale.toStringAsFixed(2)}',
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 11, color: Color(0xFF7BE38B)),
+              ),
+            ),
             _cheatButton('SAMPLE', _state.debugLoadSampleStage),
             _cheatIcon(
               Icons.chevron_left,
