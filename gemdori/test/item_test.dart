@@ -212,7 +212,7 @@ void main() {
   group('먹은 아이템 반짝 표시', () {
     // 2026-09-03 규칙 변경 — 예전에는 시간형(무적공·반전·속도)을 뺐다.
     //   이 표시는 「무엇이 걸렸는가」가 아니라 「무엇을 먹었는가」라 예외를 두지 않는다.
-    test('8종 전부 띄운다', () {
+    test('전 종류를 띄운다', () {
       for (final t in ItemType.values) {
         final s = make(stage: 1);
         s.applyItem(t);
@@ -596,7 +596,7 @@ void main() {
   //  상단 표시줄 — 버프만, 번호순 (2026-09-04)
   // ═══════════════════════════════════════════════════════════════
   group('상단 표시 대상', () {
-    test('갈래가 8종 전부에 정해져 있다', () {
+    test('갈래가 전 종류에 정해져 있다', () {
       final buff = ItemType.values.where((t) => t.cls == ItemClass.buff);
       final gear = ItemType.values.where((t) => t.cls == ItemClass.gear);
       final con = ItemType.values.where((t) => t.cls == ItemClass.consumable);
@@ -801,21 +801,6 @@ void brickHpColorTests() {
       expect(kBrickColors[b.hp], kBrickColors[1], reason: '내구도만 바꿔도 색이 따라온다');
     });
   });
-
-  group('샘플 스테이지 줄 지정 (끊김 시험용)', () {
-    test('지정한 줄에만 그 아이템이 심긴다', () {
-      final s = BrickState(fieldSize: const Size(320, 480))
-        ..debugLoadSampleStage();
-      for (final b in s.bricks) {
-        expect(b.item, BrickState.sampleRowItem[b.row],
-            reason: 'row ${b.row} 의 아이템이 지정과 다르다');
-      }
-    });
-
-    test('먼저 먹을 것이 아래 줄에 있다 — 순서가 곧 시험 조건이다', () {
-      final rows = BrickState.sampleRowItem.keys.toList()..sort();
-      expect(rows.last, greaterThan(rows.first));
-      expect(BrickState.sampleRowItem[rows.last], ItemType.slowBall);
-    });
-  });
+  // 2026-09-11 : 「샘플 스테이지 줄 지정 (끊김 시험용)」 묶음 삭제 — 시험이 끝나 지정을 비웠고,
+  //   지정 유무 두 경우는 brick_state_test 의 「샘플 스테이지」 묶음이 이미 맡는다
 }

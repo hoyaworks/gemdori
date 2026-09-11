@@ -68,7 +68,9 @@ class _BrickGameScreenState extends State<BrickGameScreen>
   bool _showPanel = false;
 
   /// 사건 로그를 쌓을 것인가 — **기본 꺼짐** (2026-09-10).
-  /// 켜 두면 갱신할 때마다 열두 줄의 글자 배치를 다시 재고, 그 비용이 게임 프레임에 얹힌다.
+  /// 켜 두면 갱신할 때마다 열두 줄의 글자 배치를 다시 잰다.
+  /// ⚠️ 「그 비용이 게임 프레임에 얹혀 공이 밀린다」는 **디버그 모드에서 본 것**이다 —
+  ///   profile 에서는 문제없었다 (2026-09-11). 필요할 때만 켜는 방식은 해가 없어 그대로 둔다.
   bool _logOn = false;
 
   /// 개발자 패널은 **초당 10번만** 새로 만든다 — 그사이에는 같은 위젯을 그대로 넘긴다.
@@ -76,7 +78,9 @@ class _BrickGameScreenState extends State<BrickGameScreen>
   /// ⭐ 주요 로직 : 게임 루프가 매 프레임 `setState` 를 부르므로, 그냥 두면 패널도
   ///   **매 프레임 통째로 다시 만들어지고 다시 재어진다.** 평소에는 값이 싸지만
   ///   아이템을 먹는 순간(로그 한 줄·효과 한 칸이 함께 늘어남) 배치 계산이 한꺼번에 몰려
-  ///   **공이 눈에 띄게 밀린다** (2026-09-10 확인 — 패널을 숨기면 증상이 사라졌다).
+  ///   **공이 눈에 띄게 밀렸다** (2026-09-10 — 패널을 숨기면 증상이 사라졌다).
+  /// ⚠️ 이 증상은 **디버그 모드의 첫 실행 값**이었다 — profile 에서는 없다 (2026-09-11).
+  ///   갱신을 아끼는 구조는 해가 없고 디버그로 개발할 때 여전히 도움이 돼 그대로 둔다.
   ///   같은 위젯 인스턴스를 다시 넘기면 Flutter 가 그 아래를 통째로 건너뛴다.
   /// ⚠️ 값이 늦게 보이면 안 되는 것(크기 단계·치트)은 [_dropPanelCache] 로 즉시 지운다.
   Widget? _panelCache;
@@ -284,7 +288,7 @@ class _BrickGameScreenState extends State<BrickGameScreen>
     );
   }
 
-  /// 상단 속도 표시 — `SPEED (▲▲)` 로 **항상** 보여 준다.
+  /// 상단 속도 표시 — `SPEED ▲2` 처럼 **항상** 보여 준다.
   ///
   /// 주요 로직 : 색·굵기는 바꾸지 않고 **깜빡임 하나로만** 알린다 (2026-09-03).
   ///   ① 아이템으로 바뀐 직후 두 번 · ② 원래대로 돌아가기 2초 전
@@ -301,7 +305,7 @@ class _BrickGameScreenState extends State<BrickGameScreen>
 
   /// 먹은 아이템을 화면 가운데 잠깐 크게 띄운다.
   ///
-  /// 주요 로직 : **8종 전부** 띄운다 (2026-09-03 확대).
+  /// 주요 로직 : **전 종류**를 띄운다 (2026-09-03 확대).
   ///   상단 표시줄은 「지금 걸려 있는 것」을, 이 표시는 「방금 먹은 것」을 알린다.
   ///   뜻이 다르므로 상단에 남는 아이템이라고 해서 뺄 이유가 없다.
   ///   진하기 계산은 BrickState 가 하므로 여기서는 그리기만 한다.
@@ -419,11 +423,6 @@ class _BrickGameScreenState extends State<BrickGameScreen>
     _focusNode.requestFocus();
   }
 
-  /// 경기장 크기 단계를 바꾼다.
-  ///
-  /// 주요 로직 : 크기 자체는 여기서 계산하지 않는다. 단계만 바꿔 두면
-  ///   다음 build 의 `fitField` 가 상한으로 반영하고, `resize()` 가
-  ///   날아가던 공의 속력까지 다시 맞춘다 — 계산이 한 군데에만 있다.
   /// 개발자 패널 — [_panelInterval] 마다만 새로 만든다. 위 [_panelCache] 설명 참조.
   Widget _panel() {
     if (_panelCache == null || _lastTick - _panelAt >= _panelInterval) {
@@ -451,6 +450,12 @@ class _BrickGameScreenState extends State<BrickGameScreen>
     _focusNode.requestFocus();
   }
 
+  /// 경기장 크기 단계를 바꾼다.
+  ///
+  /// 주요 로직 : 크기 자체는 여기서 계산하지 않는다. 단계만 바꿔 두면
+  ///   다음 build 의 `fitField` 가 상한으로 반영하고, `resize()` 가
+  ///   날아가던 공의 속력까지 다시 맞춘다 — 계산이 한 군데에만 있다.
+  // 2026-09-11 : 이 설명이 코드를 옮기다 `_panel()` 위에 붙어 있던 것을 제자리로 돌렸다
   void _setPreset(FieldPreset p) {
     _dropPanelCache();
     setState(() => _preset = p);

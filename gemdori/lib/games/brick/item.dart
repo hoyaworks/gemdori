@@ -53,10 +53,10 @@ enum ItemClass {
   consumable,
 }
 
-/// 나열 순서 = 화면 표시 번호(1~8)이자 샘플 스테이지에 심는 순서다.
+/// 나열 순서 = 화면 표시 번호(1~10)이자 샘플 스테이지에 심는 순서다.
 /// **상단 표시 순서도 이 순서를 따른다** — 먹은 순서로 두면 자리가 뒤바뀐다.
 enum ItemType {
-  // ── 도움 (푸른색·초록 계열) ──
+  // ── 도움 ── (「도움=푸른·초록 / 방해=경고색」 규칙은 2026-09-04 폐지 — 색은 디자인 영역)
   invincibleBall(ItemKind.help, ItemDuration.timed, ItemClass.buff, seconds: 6), // 1 ◉
   multiBall(ItemKind.help, ItemDuration.untilLost, ItemClass.gear), //              2 ◎
   slowBall(ItemKind.help, ItemDuration.timed, ItemClass.buff, seconds: 10), //      3 ▼
@@ -102,7 +102,7 @@ enum ItemType {
   /// 상단 표시줄 대상인가.
   ///
   /// 상세 설명 : 속도(▼▲)도 buff 지만 `effects` 에 들어가지 않는다.
-  ///   `SPEED (▲▲)` 표시가 절대 단계를 보여주므로 기호보다 정보가 많다.
+  ///   `SPEED ▲2` 표시가 절대 단계를 보여주므로 기호보다 정보가 많다.
   bool get isBuff => cls == ItemClass.buff;
 
   /// 서로 지우는 짝. 없으면 null
