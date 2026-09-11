@@ -67,6 +67,25 @@ class _BrickGameScreenState extends State<BrickGameScreen>
   /// 지금 패널이 떠 있는가 — build 에서 정해 두고 게임 루프가 읽는다
   bool _showPanel = false;
 
+  /// 사건 로그를 쌓을 것인가 — **기본 꺼짐** (2026-09-10).
+  /// 켜 두면 갱신할 때마다 열두 줄의 글자 배치를 다시 재고, 그 비용이 게임 프레임에 얹힌다.
+  bool _logOn = false;
+
+  /// 개발자 패널은 **초당 10번만** 새로 만든다 — 그사이에는 같은 위젯을 그대로 넘긴다.
+  ///
+  /// ⭐ 주요 로직 : 게임 루프가 매 프레임 `setState` 를 부르므로, 그냥 두면 패널도
+  ///   **매 프레임 통째로 다시 만들어지고 다시 재어진다.** 평소에는 값이 싸지만
+  ///   아이템을 먹는 순간(로그 한 줄·효과 한 칸이 함께 늘어남) 배치 계산이 한꺼번에 몰려
+  ///   **공이 눈에 띄게 밀린다** (2026-09-10 확인 — 패널을 숨기면 증상이 사라졌다).
+  ///   같은 위젯 인스턴스를 다시 넘기면 Flutter 가 그 아래를 통째로 건너뛴다.
+  /// ⚠️ 값이 늦게 보이면 안 되는 것(크기 단계·치트)은 [_dropPanelCache] 로 즉시 지운다.
+  Widget? _panelCache;
+  Duration _panelAt = Duration.zero;
+
+  static const _panelInterval = Duration(milliseconds: 100);
+
+  void _dropPanelCache() => _panelCache = null;
+
   /// ⭐ **이 게임이 미리 받아 둘 것** — 로딩 막의 규칙 자체는 `GameLoadingMixin` 에 있다.
   ///   벽돌깨기는 소리뿐이다. 나중에 이미지·폰트가 생기면 여기 한 줄씩 늘린다.
   @override
@@ -88,7 +107,7 @@ class _BrickGameScreenState extends State<BrickGameScreen>
     // 사건은 가져가면서 비워진다 — 화면이 매 프레임 한 번만 부른다
     final events = _state.takeEvents();
     _sound.playAll(events);
-    if (_showPanel) _log.addAll(events);
+    if (_showPanel && _logOn) _log.addAll(events);
   }
 
   void _movePaddle(Offset localPos) {
@@ -182,88 +201,82 @@ class _BrickGameScreenState extends State<BrickGameScreen>
       // SafeArea — 안드로이드 하단 버튼·노치에 경기장이 가리지 않게 (2026-09-07)
       body: SafeArea(
         child: Padding(
-        padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
-        child: KeyboardListener(
-          focusNode: _focusNode,
-          autofocus: true,
-          onKeyEvent: (e) {
-            if (e is! KeyDownEvent) return;
-            // ⭐ 막은 **화면만 가린다.** 키보드는 막 아래로 그대로 들어오므로
-            //   여기서 따로 끊어야 한다 — 안 그러면 스페이스로 발사돼 버린다
-            if (!ready) return;
-            if (e.logicalKey == LogicalKeyboardKey.space) {
-              _primaryAction();
-              return;
-            }
-            // 크기 전환 1·2·3 — 패널이 안 뜨는 **좁은 화면에서도** 되게 키를 남긴다.
-            // 단 개발 모드일 때만 — 실서비스에서 이용자가 누르면 안 된다
-            if (!devMode) return;
-            final p = _presetKeys[e.logicalKey];
-            if (p != null) _setPreset(p);
-          },
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              // 패널을 띄울지 **먼저** 정한다 — 게임에 줄 폭이 여기서 갈린다 (2026-09-07).
-              // 실서비스 빌드면 visibleIn 이 늘 false 라, 이 아래는 게임만 남는다.
-              final showPanel = DevPanel.visibleIn(constraints.maxWidth);
-              _showPanel = showPanel;
-              final gameWidth = DevPanel.gameWidth(constraints.maxWidth);
-
-              // 경기장은 2:3 고정. 남는 공간은 배경색으로 비운다 (2026-09-07 재조정).
-              // 입력 좌표가 경기장 기준이 되도록 SizedBox **안쪽**에 붙인다.
-              final size = BrickState.fitField(
-                Size(gameWidth, constraints.maxHeight),
-                maxHeight: BrickState.presetHeight(_preset),
-              );
-              if (size != _state.fieldSize) {
-                _state.resize(size);
+          padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+          child: KeyboardListener(
+            focusNode: _focusNode,
+            autofocus: true,
+            onKeyEvent: (e) {
+              if (e is! KeyDownEvent) return;
+              // ⭐ 막은 **화면만 가린다.** 키보드는 막 아래로 그대로 들어오므로
+              //   여기서 따로 끊어야 한다 — 안 그러면 스페이스로 발사돼 버린다
+              if (!ready) return;
+              if (e.logicalKey == LogicalKeyboardKey.space) {
+                _primaryAction();
+                return;
               }
-              final field = Center(
-                child: SizedBox(
-                  width: size.width,
-                  height: size.height,
-                  child: MouseRegion(
-                    onHover: (e) => _movePaddle(e.localPosition),
-                    child: GestureDetector(
-                      behavior: HitTestBehavior.opaque,
-                      onPanUpdate: (e) => _movePaddle(e.localPosition),
-                      onTapDown: (e) {
-                        _focusNode.requestFocus(); // 클릭 후에도 스페이스가 먹도록
-                        _movePaddle(e.localPosition);
-                        _primaryAction();
-                      },
-                      child: Stack(
-                        fit: StackFit.expand,
-                        children: [
-                          CustomPaint(
-                            size: size,
-                            painter: BrickPainter(_state),
-                          ),
-                          _itemFlash(),
-                          _overlay(),
-                        ],
+              // 크기 전환 1·2·3 — 패널이 안 뜨는 **좁은 화면에서도** 되게 키를 남긴다.
+              // 단 개발 모드일 때만 — 실서비스에서 이용자가 누르면 안 된다
+              if (!devMode) return;
+              final p = _presetKeys[e.logicalKey];
+              if (p != null) _setPreset(p);
+            },
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                // 패널을 띄울지 **먼저** 정한다 — 게임에 줄 폭이 여기서 갈린다 (2026-09-07).
+                // 실서비스 빌드면 visibleIn 이 늘 false 라, 이 아래는 게임만 남는다.
+                final showPanel = DevPanel.visibleIn(constraints.maxWidth);
+                _showPanel = showPanel;
+                final gameWidth = DevPanel.gameWidth(constraints.maxWidth);
+
+                // 경기장은 2:3 고정. 남는 공간은 배경색으로 비운다 (2026-09-07 재조정).
+                // 입력 좌표가 경기장 기준이 되도록 SizedBox **안쪽**에 붙인다.
+                final size = BrickState.fitField(
+                  Size(gameWidth, constraints.maxHeight),
+                  maxHeight: BrickState.presetHeight(_preset),
+                );
+                if (size != _state.fieldSize) {
+                  _state.resize(size);
+                }
+                final field = Center(
+                  child: SizedBox(
+                    width: size.width,
+                    height: size.height,
+                    child: MouseRegion(
+                      onHover: (e) => _movePaddle(e.localPosition),
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onPanUpdate: (e) => _movePaddle(e.localPosition),
+                        onTapDown: (e) {
+                          _focusNode.requestFocus(); // 클릭 후에도 스페이스가 먹도록
+                          _movePaddle(e.localPosition);
+                          _primaryAction();
+                        },
+                        child: Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            CustomPaint(
+                              size: size,
+                              painter: BrickPainter(_state),
+                            ),
+                            _itemFlash(),
+                            _overlay(),
+                          ],
+                        ),
                       ),
                     ),
                   ),
-                ),
-              );
-              if (!showPanel) return field;
-              // stretch — 패널이 세로를 꽉 채워야 안쪽 로그 목록이 높이를 갖는다
-              return Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Expanded(child: field),
-                  const SizedBox(width: DevPanel.gap),
-                  DevPanel(
-                    state: _state,
-                    log: _log,
-                    preset: _preset,
-                    onCheat: _runCheat,
-                    onPreset: _setPreset,
-                  ),
-                ],
-              );
-            },
+                );
+                if (!showPanel) return field;
+                // stretch — 패널이 세로를 꽉 채워야 안쪽 로그 목록이 높이를 갖는다
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(child: field),
+                    const SizedBox(width: DevPanel.gap),
+                    _panel(),
+                  ],
+                );
+              },
             ),
           ),
         ),
@@ -329,9 +342,7 @@ class _BrickGameScreenState extends State<BrickGameScreen>
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              _label(_state.isSampleStage
-                  ? 'SAMPLE'
-                  : 'STAGE ${_state.stage}'),
+              _label(_state.isSampleStage ? 'SAMPLE' : 'STAGE ${_state.stage}'),
               // 조작 안내는 첫 스테이지에서만 — 그 뒤로는 이미 익혔다
               if (_state.stage <= 1) ...[
                 const SizedBox(height: 12),
@@ -403,6 +414,7 @@ class _BrickGameScreenState extends State<BrickGameScreen>
   //    한 번 누른 순간부터 스페이스·숫자키가 버튼으로 가서 게임에 안 들어온다.
 
   void _runCheat(VoidCallback action) {
+    _dropPanelCache();
     setState(action);
     _focusNode.requestFocus();
   }
@@ -412,7 +424,35 @@ class _BrickGameScreenState extends State<BrickGameScreen>
   /// 주요 로직 : 크기 자체는 여기서 계산하지 않는다. 단계만 바꿔 두면
   ///   다음 build 의 `fitField` 가 상한으로 반영하고, `resize()` 가
   ///   날아가던 공의 속력까지 다시 맞춘다 — 계산이 한 군데에만 있다.
+  /// 개발자 패널 — [_panelInterval] 마다만 새로 만든다. 위 [_panelCache] 설명 참조.
+  Widget _panel() {
+    if (_panelCache == null || _lastTick - _panelAt >= _panelInterval) {
+      _panelAt = _lastTick;
+      _panelCache = DevPanel(
+        state: _state,
+        log: _log,
+        preset: _preset,
+        onCheat: _runCheat,
+        onPreset: _setPreset,
+        logOn: _logOn,
+        onToggleLog: _toggleLog,
+      );
+    }
+    return _panelCache!;
+  }
+
+  /// 로그를 껐다 켠다. 끌 때는 쌓인 줄도 비운다 — 다시 켰을 때 옛 사건이 섞이면 헷갈린다
+  void _toggleLog() {
+    _dropPanelCache();
+    setState(() {
+      _logOn = !_logOn;
+      if (!_logOn) _log.clear();
+    });
+    _focusNode.requestFocus();
+  }
+
   void _setPreset(FieldPreset p) {
+    _dropPanelCache();
     setState(() => _preset = p);
     _focusNode.requestFocus();
   }
@@ -428,12 +468,12 @@ class _BrickGameScreenState extends State<BrickGameScreen>
   };
 
   Widget _label(String text) => Text(
-        text,
-        style: const TextStyle(
-          fontSize: 32,
-          fontWeight: FontWeight.w700,
-          color: Colors.white,
-          letterSpacing: 2,
-        ),
-      );
+    text,
+    style: const TextStyle(
+      fontSize: 32,
+      fontWeight: FontWeight.w700,
+      color: Colors.white,
+      letterSpacing: 2,
+    ),
+  );
 }

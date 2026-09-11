@@ -801,4 +801,21 @@ void brickHpColorTests() {
       expect(kBrickColors[b.hp], kBrickColors[1], reason: '내구도만 바꿔도 색이 따라온다');
     });
   });
+
+  group('샘플 스테이지 줄 지정 (끊김 시험용)', () {
+    test('지정한 줄에만 그 아이템이 심긴다', () {
+      final s = BrickState(fieldSize: const Size(320, 480))
+        ..debugLoadSampleStage();
+      for (final b in s.bricks) {
+        expect(b.item, BrickState.sampleRowItem[b.row],
+            reason: 'row ${b.row} 의 아이템이 지정과 다르다');
+      }
+    });
+
+    test('먼저 먹을 것이 아래 줄에 있다 — 순서가 곧 시험 조건이다', () {
+      final rows = BrickState.sampleRowItem.keys.toList()..sort();
+      expect(rows.last, greaterThan(rows.first));
+      expect(BrickState.sampleRowItem[rows.last], ItemType.slowBall);
+    });
+  });
 }

@@ -778,7 +778,20 @@ void sampleStageTests() {
       expect(s.status, GameStatus.ready);
     });
 
-    test('무적공만 빠지고 나머지가 2개씩 들어간다', () {
+    // 샘플은 두 가지 방식으로 깔린다 — 줄 지정이 있으면 그쪽이 이긴다 (2026-09-10).
+    // 시험 목적에 따라 지정을 넣었다 뺐다 하므로, 테스트도 두 경우를 다 받는다.
+    test('줄 지정이 있으면 지정한 줄에만 심긴다', () {
+      if (BrickState.sampleRowItem.isEmpty) return; // 지정이 없으면 아래 테스트가 맡는다
+      final s = BrickState(fieldSize: const Size(400, 600), refWidth: 400);
+      s.debugLoadSampleStage();
+
+      for (final b in s.bricks) {
+        expect(b.item, BrickState.sampleRowItem[b.row], reason: 'row ${b.row}');
+      }
+    });
+
+    test('줄 지정이 없으면 무적공만 빠지고 나머지가 2개씩 들어간다', () {
+      if (BrickState.sampleRowItem.isNotEmpty) return; // 지정이 있으면 위 테스트가 맡는다
       final s = BrickState(fieldSize: const Size(400, 600), refWidth: 400);
       s.debugLoadSampleStage();
 

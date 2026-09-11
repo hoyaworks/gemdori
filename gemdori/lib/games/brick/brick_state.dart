@@ -714,6 +714,20 @@ class BrickState {
   /// 샘플에서 빼는 아이템 — 벽돌을 한 번에 쓸어버려 다른 시험을 할 시간이 없다
   static const Set<ItemType> sampleExcluded = {ItemType.invincibleBall};
 
+  /// 샘플 스테이지 — **줄마다 심을 아이템을 지정**한다 (2026-09-10, 끊김 시험용).
+  ///
+  /// ⭐ 주요 로직 : 무작위로 흩뿌리면 **먹는 순서를 정할 수 없다.**
+  ///   「무엇을 먼저 먹었는가」로 갈리는 증상을 쫓을 때는 순서가 곧 시험 조건이다.
+  ///   벽돌은 **아래 줄부터** 깨지므로 **먼저 먹이고 싶은 것을 큰 번호 줄에** 둔다
+  ///   (row 0 = 맨 위 · row 4 = 맨 아래).
+  ///   한 줄 전체(7칸)가 같은 아이템이라 **반복 습득**도 함께 볼 수 있다.
+  ///
+  /// ⚠️ **비워 두면 예전처럼** 전 종류를 조금씩 흩뿌린다 — 시험이 끝나면 `{}` 로 돌린다.
+  static const Map<int, ItemType> sampleRowItem = {
+    4: ItemType.slowBall, // 맨 아래 = 속도 ▼ (상단 표시에 안 올라간다)
+    3: ItemType.paddleGrow, // 그다음 = 패들 확대 (첫 버프가 되는 자리)
+  };
+
   /// 마지막 스테이지인가 (다음 스테이지가 아직 없는가)
   bool get isLastStage => stage >= stages.length;
 
@@ -860,6 +874,16 @@ class BrickState {
   /// 주요 로직 : 종류마다 같은 개수를 넣는다. 무작위로 뿌리면 어떤 아이템은
   ///   한 번도 안 나와 시험이 안 되기 때문이다. 위치만 무작위다.
   void _placeSampleItems() {
+    // 줄 지정이 있으면 그대로 심고 끝낸다 — 위 [sampleRowItem] 설명 참조
+    if (sampleRowItem.isNotEmpty) {
+      for (var i = 0; i < bricks.length; i++) {
+        final b = bricks[i];
+        final type = sampleRowItem[b.row];
+        if (type != null) bricks[i] = Brick(b.row, b.col, b.hp, item: type);
+      }
+      return;
+    }
+
     final free = [...bricks];
     for (final type in ItemType.values) {
       if (sampleExcluded.contains(type)) continue;

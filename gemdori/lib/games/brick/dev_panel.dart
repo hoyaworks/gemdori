@@ -37,6 +37,7 @@
 import 'package:flutter/material.dart';
 
 import '../../app/dev_mode.dart';
+import '../../app/build_info.dart';
 import 'brick_painter.dart';
 import 'brick_state.dart';
 import 'item.dart';
@@ -95,6 +96,8 @@ class DevPanel extends StatelessWidget {
     required this.preset,
     required this.onCheat,
     required this.onPreset,
+    required this.logOn,
+    required this.onToggleLog,
     super.key,
   });
 
@@ -112,6 +115,15 @@ class DevPanel extends StatelessWidget {
   final void Function(VoidCallback action) onCheat;
 
   final void Function(FieldPreset preset) onPreset;
+
+  /// 사건 로그를 쌓고 그릴 것인가.
+  ///
+  /// ⭐ 주요 로직 : **기본은 꺼짐**이다 (2026-09-10). 로그는 열두 줄이 매번 새 글자라
+  ///   갱신할 때마다 글자 배치를 다시 재고, 그 비용이 **게임 프레임에 그대로 얹힌다.**
+  ///   실제로 아이템을 먹는 순간 공이 눈에 띄게 밀렸다 — 켜고 볼 때만 켠다.
+  final bool logOn;
+
+  final VoidCallback onToggleLog;
 
   /// 패널 폭(px). 고정이다 — 남는 공간을 나눠 가지면 게임 크기가 창에 따라 흔들린다
   static const double width = 300;
@@ -146,43 +158,58 @@ class DevPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: width,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: _bg,
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _title('STATE'),
-          const SizedBox(height: 6),
-          _rows(),
-          const SizedBox(height: 6),
-          _effects(),
-          const SizedBox(height: 14),
-          _title('EVENTS'),
-          const SizedBox(height: 6),
-          Expanded(child: _eventList()),
-          const SizedBox(height: 12),
-          _title('CHEATS'),
-          const SizedBox(height: 6),
-          _cheats(),
-        ],
+    // 주요 로직 : 그리기를 게임 화면과 **따로 떼어 둔다** (2026-09-10).
+    //   패널만 바뀌었을 때 게임 화면까지 다시 그리지 않게 한다.
+    return RepaintBoundary(
+      child: Container(
+        width: width,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: _bg,
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _title('STATE'),
+            const SizedBox(height: 6),
+            _rows(),
+            const SizedBox(height: 6),
+            _effects(),
+            const SizedBox(height: 14),
+            _eventsHeader(),
+            const SizedBox(height: 6),
+            Expanded(child: _eventList()),
+            const SizedBox(height: 12),
+            _title('CHEATS'),
+            const SizedBox(height: 6),
+            _cheats(),
+            const SizedBox(height: 10),
+            _buildStamp(),
+          ],
+        ),
       ),
     );
   }
 
+  /// 이 빌드가 언제 만들어졌는가 — 자세한 이유는 `build_info.dart` 머리말.
+  ///
+  /// 주요 로직 : **맨 아래**에 둔다. 시험 중에 늘 보여야 하지만
+  ///   눈이 먼저 가야 할 것(상태·사건)은 아니다.
+  Widget _buildStamp() => Text(
+    'BUILD  $buildAt',
+    style: const TextStyle(fontSize: 10, color: _dim, letterSpacing: 0.5),
+  );
+
   Widget _title(String text) => Text(
-        text,
-        style: const TextStyle(
-          fontSize: 11,
-          letterSpacing: 2,
-          fontWeight: FontWeight.w700,
-          color: _accent,
-        ),
-      );
+    text,
+    style: const TextStyle(
+      fontSize: 11,
+      letterSpacing: 2,
+      fontWeight: FontWeight.w700,
+      color: _accent,
+    ),
+  );
 
   /// 상태 값 — 한 곳(BrickState)에서 전부 읽어 온다.
   /// 여기서 계산해 만드는 값이 하나도 없다는 것이 이 패널이 보여주려는 것이다.
@@ -194,87 +221,153 @@ class DevPanel extends StatelessWidget {
         _row('stage', state.isSampleStage ? 'SAMPLE' : '${state.stage}'),
         _row('score / lives', '${state.score}  /  ${state.lives}'),
         _row('speed', '${state.speedStage + 1}  ${state.speedMark}'),
-        _row('field', '${f.width.round()}×${f.height.round()}'
-            '   ×${state.scale.toStringAsFixed(2)}'),
-        _row('balls / bricks', '${state.balls.length}  /  ${state.remainingBricks}'),
+        _row(
+          'field',
+          '${f.width.round()}×${f.height.round()}'
+              '   ×${state.scale.toStringAsFixed(2)}',
+        ),
+        _row(
+          'balls / bricks',
+          '${state.balls.length}  /  ${state.remainingBricks}',
+        ),
         _row('falling', '${state.fallingItems.length}'),
       ],
     );
   }
 
   Widget _row(String name, String value) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 1),
-        child: Row(
-          children: [
-            SizedBox(
-              width: 96,
-              child: Text(name,
-                  style: const TextStyle(fontSize: 11, color: _dim)),
-            ),
-            Expanded(
-              child: Text(value,
-                  style: const TextStyle(fontSize: 11, color: _fg)),
-            ),
-          ],
+    padding: const EdgeInsets.symmetric(vertical: 1),
+    child: Row(
+      children: [
+        SizedBox(
+          width: 96,
+          child: Text(name, style: const TextStyle(fontSize: 11, color: _dim)),
         ),
-      );
+        Expanded(
+          child: Text(value, style: const TextStyle(fontSize: 11, color: _fg)),
+        ),
+      ],
+    ),
+  );
 
   /// 걸려 있는 효과와 남은 시간.
   ///
   /// 주요 로직 : 상단 표시줄(hudEffects)과 달리 **버프·장비를 가리지 않고 전부** 낸다.
   ///   상단은 플레이어용이라 화면으로 알 수 있는 것(멀티공·패들 폭)을 뺐지만,
   ///   여기는 「지금 상태에 무엇이 들어 있나」를 보여주는 자리다.
+  ///
+  /// ⭐ 주요 로직 : **줄 수를 [effectSlots] 개로 고정한다** (2026-09-10).
+  ///   예전에는 걸린 효과 수만큼 줄이 늘고 줄었다. 그러면 **아이템을 처음 먹는 순간**
+  ///   패널의 배치가 통째로 다시 계산되고, 그 값이 **게임 프레임에 얹혀 공이 밀렸다.**
+  ///   두 번째 습득부터 조용했던 이유도 이것 — 그때는 줄 수가 이미 그대로였다.
+  ///   빈 슬롯은 자리만 차지하게 두면 **줄 수가 영영 변하지 않는다.**
+  /// ⚠️ 슬롯보다 많이 걸리면 마지막 줄에 `+N` 으로 알린다 — 줄을 늘리지 않는다.
   Widget _effects() {
-    if (state.effects.isEmpty) {
-      return _row('effects', '—');
-    }
+    final on = [
+      for (final t in ItemType.values)
+        if (state.effects.containsKey(t)) t,
+    ];
+    final shown = on.length > effectSlots ? effectSlots - 1 : on.length;
+    final over = on.length - shown;
+
     return Column(
       children: [
-        for (final t in ItemType.values)
-          if (state.effects.containsKey(t))
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 1),
-              child: Row(
-                children: [
-                  const SizedBox(width: 96 - 22),
-                  ItemMark(t, size: 14),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      '${t.name}   ${_left(state.effects[t]!)}',
-                      style: const TextStyle(fontSize: 11, color: _fg),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+        for (var i = 0; i < effectSlots; i++)
+          SizedBox(
+            height: _effectRowHeight,
+            child: i < shown
+                ? _effectRow(on[i])
+                : (i == shown && over > 0 ? _effectMore(over) : null),
+          ),
       ],
     );
   }
+
+  /// 효과 한 줄 — 기호 + 이름 + 남은 시간
+  Widget _effectRow(ItemType t) => Row(
+    children: [
+      const SizedBox(width: 96 - 22),
+      ItemMark(t, size: 14),
+      const SizedBox(width: 8),
+      Expanded(
+        child: Text(
+          '${t.name}   ${_left(state.effects[t]!)}',
+          style: const TextStyle(fontSize: 11, color: _fg),
+        ),
+      ),
+    ],
+  );
+
+  /// 슬롯을 넘긴 개수 알림
+  Widget _effectMore(int n) => Row(
+    children: [
+      const SizedBox(width: 96 - 22),
+      Text('+$n', style: const TextStyle(fontSize: 11, color: _dim)),
+    ],
+  );
+
+  /// 효과 슬롯 수 — 이만큼의 줄을 **늘 그린다**
+  static const int effectSlots = 5;
+
+  static const double _effectRowHeight = 18;
 
   /// 무기한형(untilLost)은 남은 시간이 무한이라 숫자로 낼 수 없다
   static String _left(double seconds) =>
       seconds.isInfinite ? '∞' : '${seconds.toStringAsFixed(1)}s';
 
+  /// EVENTS 제목 + 켜고 끄는 스위치.
+  /// 제목 줄에 붙이는 이유 = 무엇을 끄는 스위치인지 딴 데 두면 모른다
+  Widget _eventsHeader() => Row(
+    children: [
+      Expanded(child: _title('EVENTS')),
+      InkWell(
+        onTap: onToggleLog,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+          child: Text(
+            logOn ? 'ON' : 'OFF',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 1,
+              color: logOn ? _accent : _dim,
+            ),
+          ),
+        ),
+      ),
+    ],
+  );
+
+  /// 주요 로직 : 스크롤 목록(ListView)이 아니라 **그냥 세로 나열**이다 (2026-09-10 교체).
+  ///   줄 수가 열둘로 고정이라 스크롤이 필요 없는데, 스크롤 목록은 볼 영역·물리 계산을
+  ///   매번 함께 돌려 **고정 줄을 그리는 것보다 훨씬 비싸다.**
   Widget _eventList() {
+    if (!logOn) {
+      return const Text(
+        'OFF — 켜면 여기에 쌓인다',
+        style: TextStyle(fontSize: 11, color: _dim),
+      );
+    }
     final lines = log.lines;
     if (lines.isEmpty) {
       return const Text('—', style: TextStyle(fontSize: 11, color: _dim));
     }
-    return ListView.builder(
-      padding: EdgeInsets.zero,
-      itemCount: lines.length,
-      itemBuilder: (context, i) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 1),
-        child: Text(
-          '${lines[i]}',
-          style: TextStyle(
-            fontSize: 11,
-            // 맨 위(가장 최근) 한 줄만 밝게 — 눈이 어디를 볼지 정해 준다
-            color: i == 0 ? _fg : _dim,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (var i = 0; i < lines.length; i++)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 1),
+            child: Text(
+              '${lines[i]}',
+              style: TextStyle(
+                fontSize: 11,
+                // 맨 위(가장 최근) 한 줄만 밝게 — 눈이 어디를 볼지 정해 준다
+                color: i == 0 ? _fg : _dim,
+              ),
+            ),
           ),
-        ),
-      ),
+      ],
     );
   }
 
@@ -306,8 +399,10 @@ class DevPanel extends StatelessWidget {
               width: 44,
               child: Text('stage', style: TextStyle(fontSize: 11, color: _dim)),
             ),
-            _iconButton(Icons.chevron_left,
-                () => state.debugGoToStage(state.stage - 1)),
+            _iconButton(
+              Icons.chevron_left,
+              () => state.debugGoToStage(state.stage - 1),
+            ),
             SizedBox(
               width: 52,
               child: Text(
@@ -316,8 +411,10 @@ class DevPanel extends StatelessWidget {
                 style: const TextStyle(fontSize: 11, color: _fg),
               ),
             ),
-            _iconButton(Icons.chevron_right,
-                () => state.debugGoToStage(state.stage + 1)),
+            _iconButton(
+              Icons.chevron_right,
+              () => state.debugGoToStage(state.stage + 1),
+            ),
             const SizedBox(width: 4),
             _textButton('SAMPLE', state.debugLoadSampleStage),
           ],
@@ -359,30 +456,32 @@ class DevPanel extends StatelessWidget {
           foregroundColor: on ? _accent : _dim,
         ),
         onPressed: () => onPreset(p),
-        child: Text('$label${p.index + 1}',
-            style: const TextStyle(fontSize: 10, letterSpacing: 0.5)),
+        child: Text(
+          '$label${p.index + 1}',
+          style: const TextStyle(fontSize: 10, letterSpacing: 0.5),
+        ),
       ),
     );
   }
 
   Widget _iconButton(IconData icon, VoidCallback action) => IconButton(
-        iconSize: 18,
-        visualDensity: VisualDensity.compact,
-        padding: EdgeInsets.zero,
-        constraints: const BoxConstraints(minWidth: 28, minHeight: 26),
-        color: _dim,
-        icon: Icon(icon),
-        onPressed: () => onCheat(action),
-      );
+    iconSize: 18,
+    visualDensity: VisualDensity.compact,
+    padding: EdgeInsets.zero,
+    constraints: const BoxConstraints(minWidth: 28, minHeight: 26),
+    color: _dim,
+    icon: Icon(icon),
+    onPressed: () => onCheat(action),
+  );
 
   Widget _textButton(String text, VoidCallback action) => TextButton(
-        style: TextButton.styleFrom(
-          minimumSize: Size.zero,
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-          foregroundColor: _dim,
-        ),
-        onPressed: () => onCheat(action),
-        child: Text(text, style: const TextStyle(fontSize: 10)),
-      );
+    style: TextButton.styleFrom(
+      minimumSize: Size.zero,
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      foregroundColor: _dim,
+    ),
+    onPressed: () => onCheat(action),
+    child: Text(text, style: const TextStyle(fontSize: 10)),
+  );
 }
