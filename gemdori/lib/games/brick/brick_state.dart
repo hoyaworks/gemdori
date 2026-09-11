@@ -457,6 +457,16 @@ class BrickState {
   int lives = maxLives;
   int score = 0;
 
+  /// 이 판에서 치트를 썼는가 — 쓴 판의 점수는 최고 기록에 넣지 않는다 (2026-09-11).
+  /// 다시 시작([restart])하면 지워진다.
+  bool cheated = false;
+
+  /// 이 판의 점수를 최고 기록에 넣어도 되는가.
+  ///
+  /// 주요 로직 : 저장은 화면 쪽 일이지만, **「이 점수를 믿어도 되나」는 게임 규칙**이라 여기서 판단한다.
+  ///   샘플 스테이지(시험장)와 치트를 쓴 판은 뺀다.
+  bool get recordable => !isSampleStage && !cheated;
+
   /// 목숨 개수. 화면에는 하트로 그린다.
   static const int maxLives = 3;
 
@@ -898,6 +908,7 @@ class BrickState {
     final backToSample = isSampleStage;
     lives = maxLives;
     score = 0;
+    cheated = false; // 새 판이다 — 치트 흔적도 지운다
     loadStage(backToSample ? sampleStage : 1);
   }
 
@@ -1386,21 +1397,32 @@ class BrickState {
   //  주요 로직 : 지우지 않고 남겨 둔다 (2026-09-07). 실서비스 빌드에서는
   //    패널이 통째로 빠져 **부르는 곳이 없어지므로**, 여기서 또 막을 이유가 없다.
   //    규칙 코드에 배포 분기를 섞으면 그쪽이 더 위험하다.
+  //
+  //  주요 로직 : 치트를 부르면 [cheated] 가 켜져 **그 판 점수는 최고 기록에 안 들어간다** (2026-09-11).
+  //    개발 중에 버튼으로 만든 점수가 기기 기록을 더럽히지 않게.
 
   /// 지정한 스테이지의 시작 단계로 바로 간다.
-  void debugGoToStage(int n) => loadStage(n.clamp(1, stages.length));
+  void debugGoToStage(int n) {
+    cheated = true;
+    loadStage(n.clamp(1, stages.length));
+  }
 
   /// 아이템 시험용 샘플 스테이지로 간다 — 파랑 5줄.
-  void debugLoadSampleStage() => loadStage(sampleStage);
+  void debugLoadSampleStage() {
+    cheated = true;
+    loadStage(sampleStage);
+  }
 
   /// 게임 종료 상황으로 바로 간다.
   void debugGameOver() {
+    cheated = true;
     lives = 0;
     status = GameStatus.gameOver;
   }
 
   /// 현재 스테이지를 자동으로 클리어한다.
   void debugClearStage() {
+    cheated = true;
     for (final b in bricks) {
       b.hp = 0;
     }

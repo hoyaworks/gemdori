@@ -23,6 +23,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 
+import '../../app/best_score.dart';
 import '../../app/dev_mode.dart';
 import '../../app/game_loading.dart';
 import 'brick_painter.dart';
@@ -32,6 +33,10 @@ import 'sound.dart';
 
 class BrickGameScreen extends StatefulWidget {
   const BrickGameScreen({super.key});
+
+  /// 이 게임을 가리키는 이름 — 최고 점수 저장 키 등에 쓴다 (2026-09-11).
+  /// ⚠️ 바꾸면 기기에 남아 있던 기록을 못 찾는다
+  static const String gameId = 'brick';
 
   @override
   State<BrickGameScreen> createState() => _BrickGameScreenState();
@@ -50,6 +55,19 @@ class _BrickGameScreenState extends State<BrickGameScreen>
 
   /// 효과음. 상태가 남긴 사건을 매 프레임 가져가 재생한다
   final GameSound _sound = GameSound();
+
+  /// 기기에 저장된 최고 점수 — 준비 단계에서 연다 (2026-09-11).
+  /// 열지 못하면(사생활 보호 모드 등) null 로 두고 **기능만 조용히 끈다** — 기록은 곁가지다.
+  BestScores? _bestStore;
+
+  /// 지금까지의 최고 점수 — 끝난 화면에 띄운다. 저장소를 못 열었으면 null
+  int? _best;
+
+  /// 이번 판이 최고 기록을 새로 세웠는가
+  bool _newBest = false;
+
+  /// 이번 판 점수를 이미 냈는가 — 끝난 화면은 여러 프레임 이어지므로 **한 번만** 내게 막는다
+  bool _scoreSubmitted = false;
 
   /// 개발자 패널에 띄울 최근 사건.
   ///
@@ -91,9 +109,11 @@ class _BrickGameScreenState extends State<BrickGameScreen>
   void _dropPanelCache() => _panelCache = null;
 
   /// ⭐ **이 게임이 미리 받아 둘 것** — 로딩 막의 규칙 자체는 `GameLoadingMixin` 에 있다.
-  ///   벽돌깨기는 소리뿐이다. 나중에 이미지·폰트가 생기면 여기 한 줄씩 늘린다.
+  ///   벽돌깨기는 **소리 · 최고 점수** 두 가지다. 나중에 이미지·폰트가 생기면 여기 한 줄씩 늘린다.
   @override
-  Future<void> prepareGame() => _sound.warmUp();
+  Future<void> prepareGame() async {
+    await Future.wait([_sound.warmUp(), _loadBest()]);
+  }
 
   @override
   void initState() {
@@ -108,10 +128,55 @@ class _BrickGameScreenState extends State<BrickGameScreen>
     _lastTick = elapsed;
     final step = dt.clamp(0.0, 1 / 30);
     setState(() => _state.update(step));
+    _checkFinished();
     // 사건은 가져가면서 비워진다 — 화면이 매 프레임 한 번만 부른다
     final events = _state.takeEvents();
     _sound.playAll(events);
     if (_showPanel && _logOn) _log.addAll(events);
+  }
+
+  // ─── 최고 점수 (2026-09-11) ─────────────────────────────────
+  //
+  //  상세 설명 : 저장·읽기는 `app/best_score.dart`, 「이 판을 기록해도 되나」는
+  //    `BrickState.recordable` 이 맡는다. 여기서는 **언제 낼지**와 **보여 주기**만 한다.
+
+  Future<void> _loadBest() async {
+    try {
+      final store = await BestScores.open();
+      _bestStore = store;
+      _best = store.best(BrickGameScreen.gameId);
+    } catch (_) {
+      // 저장소를 못 열면 최고 점수 기능만 빠진다 — 게임은 그대로 돈다
+    }
+  }
+
+  /// 판이 끝났는지 보고, 끝난 **첫 프레임에 한 번만** 점수를 낸다.
+  ///
+  /// 주요 로직 : 끝난 순간을 사건(GameEvent)으로 받지 않고 **상태를 보고** 가른다 —
+  ///   치트(GAME OVER · CLEARED 버튼)는 update() 밖에서 상태를 바꾸므로 사건이 남지 않는다.
+  ///   다시 시작해 끝난 상태를 벗어나면 다음 판을 위해 표시를 거둔다.
+  void _checkFinished() {
+    final s = _state.status;
+    final finished = s == GameStatus.gameOver || s == GameStatus.cleared;
+    if (!finished) {
+      _scoreSubmitted = false;
+      _newBest = false;
+      return;
+    }
+    if (_scoreSubmitted) return;
+    _scoreSubmitted = true;
+    _submitScore();
+  }
+
+  Future<void> _submitScore() async {
+    final store = _bestStore;
+    if (store == null || !_state.recordable) return;
+    final isNew = await store.submit(BrickGameScreen.gameId, _state.score);
+    if (!mounted) return;
+    setState(() {
+      _newBest = isNew;
+      _best = store.best(BrickGameScreen.gameId);
+    });
   }
 
   void _movePaddle(Offset localPos) {
@@ -377,6 +442,10 @@ class _BrickGameScreenState extends State<BrickGameScreen>
         mainAxisSize: MainAxisSize.min,
         children: [
           _label(text),
+          if (_best != null) ...[
+            const SizedBox(height: 14),
+            _bestLine(),
+          ],
           const SizedBox(height: 24),
           Row(
             mainAxisSize: MainAxisSize.min,
@@ -394,6 +463,40 @@ class _BrickGameScreenState extends State<BrickGameScreen>
           ),
         ],
       ),
+    );
+  }
+
+  /// 끝난 화면의 최고 점수 줄 — 트로피 + 점수, 새 기록이면 `NEW` (2026-09-11).
+  ///
+  /// 주요 로직 : 글자(BEST)보다 **아이콘**으로 — 서비스 텍스트 규칙(아이콘·이미지 우선).
+  ///   샘플·치트 판에서도 기존 기록은 보여 주되, `NEW` 는 기록한 판에서만 뜬다.
+  Widget _bestLine() {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Icon(Icons.emoji_events, size: 22, color: Color(0xFFFFD86B)),
+        const SizedBox(width: 8),
+        Text(
+          '$_best',
+          style: const TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.w600,
+            color: Colors.white,
+          ),
+        ),
+        if (_newBest) ...[
+          const SizedBox(width: 10),
+          const Text(
+            'NEW',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 1.5,
+              color: Color(0xFF7BE38B),
+            ),
+          ),
+        ],
+      ],
     );
   }
 
