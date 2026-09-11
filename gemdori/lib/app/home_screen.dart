@@ -18,7 +18,8 @@ import 'best_score.dart';
 //    화면 전환·목록 UI 는 건드릴 일이 없다.
 //
 //  주요 로직 : 최고 점수는 **처음 열 때와 게임에서 돌아왔을 때** 다시 읽는다 (2026-09-11).
-//    방금 한 판에서 기록이 바뀌었을 수 있기 때문이다. 기록이 없으면(0) 아무것도 띄우지 않는다.
+//    방금 한 판에서 기록이 바뀌었을 수 있기 때문이다. 기록이 없으면 **0 으로 띄운다** —
+//    칸이 비어 있으면 「점수 기록이 있는 게임인지」부터 헷갈린다.
 //
 // ═══════════════════════════════════════════════════════════════════
 
@@ -41,8 +42,11 @@ class _HomeScreenState extends State<HomeScreen> {
     ),
   ];
 
-  /// 게임별 최고 점수 — 못 읽으면 비워 두고 표시만 안 한다
+  /// 게임별 최고 점수 — 기록이 없거나 못 읽으면 0 으로 보인다
   Map<String, int> _best = const {};
+
+  /// 점수 칸 폭 — 이름·설명 칸보다 좁게 고정한다 (점수 자릿수가 늘어도 칸이 흔들리지 않게)
+  static const double _scoreCellWidth = 80;
 
   @override
   void initState() {
@@ -87,20 +91,33 @@ class _HomeScreenState extends State<HomeScreen> {
               leading: Icon(g.icon, size: 32),
               title: Text(g.title),
               subtitle: Text(g.subtitle),
+              // [게임 이름·설명 | 🏆 최고 점수 >] — 점수는 **좁은 칸으로 따로 뗀다** (2026-09-11).
+              //   이름이 먼저 읽히고, > 는 화면 오른쪽 끝에 두는 관례를 지킨다.
+              //   > 를 점수 칸 앞에 두면 점수 칸이 따로 누르는 버튼처럼 보인다.
               trailing: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // 최고 점수 — 글자(BEST) 대신 트로피 (아이콘 우선 규칙)
-                  if (best > 0) ...[
-                    const Icon(
-                      Icons.emoji_events,
-                      size: 18,
-                      color: Color(0xFFFFD86B),
+                  Container(
+                    width: 1,
+                    height: 36,
+                    color: Theme.of(context).dividerColor,
+                  ),
+                  SizedBox(
+                    width: _scoreCellWidth,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        // 글자(BEST) 대신 트로피 — 아이콘 우선 규칙
+                        const Icon(
+                          Icons.emoji_events,
+                          size: 18,
+                          color: Color(0xFFFFD86B),
+                        ),
+                        const SizedBox(width: 4),
+                        Text('$best'),
+                      ],
                     ),
-                    const SizedBox(width: 4),
-                    Text('$best'),
-                    const SizedBox(width: 8),
-                  ],
+                  ),
                   const Icon(Icons.chevron_right),
                 ],
               ),
