@@ -290,7 +290,6 @@ class _BrickGameScreenState extends State<BrickGameScreen>
                 final gameWidth = DevPanel.gameWidth(constraints.maxWidth);
 
                 // 경기장은 2:3 고정. 남는 공간은 배경색으로 비운다 (2026-09-07 재조정).
-                // 입력 좌표가 경기장 기준이 되도록 SizedBox **안쪽**에 붙인다.
                 final size = BrickState.fitField(
                   Size(gameWidth, constraints.maxHeight),
                   maxHeight: BrickState.presetHeight(_preset),
@@ -298,29 +297,48 @@ class _BrickGameScreenState extends State<BrickGameScreen>
                 if (size != _state.fieldSize) {
                   _state.resize(size);
                 }
-                final field = Center(
+                // 2026-09-14 수정 — 폰에서 패들을 움직이면 손가락이 패들을 가렸다.
+                //   원인 : 경기장을 세로 가운데 두고 터치를 경기장 **안에서만** 받았다.
+                //          패들이 경기장 맨 아래라 손가락을 패들 위에 올려야만 움직였다.
+                //   대책 : 경기장을 **위로 붙이고**, 그 아래 남는 공간까지 터치를 받는다.
+                //          엄지를 패들 밑에 두고 밀면 되므로 가리지 않는다.
+                //   ⚠️ 조작 영역은 **경기장 폭 그대로** 아래로 늘린 것이다 — 좌표 x 가
+                //      경기장 기준과 같아서 따로 바꿀 필요가 없다. 경기장 크기는 안 바뀌므로
+                //      비율·속도표·난이도에는 영향이 없다.
+                final field = Align(
+                  alignment: Alignment.topCenter,
                   child: SizedBox(
                     width: size.width,
-                    height: size.height,
+                    height: constraints.maxHeight,
                     child: MouseRegion(
                       onHover: (e) => _movePaddle(e.localPosition),
                       child: GestureDetector(
-                        behavior: HitTestBehavior.opaque,
+                        behavior: HitTestBehavior.opaque, // 빈 아래 공간도 터치를 받게
                         onPanUpdate: (e) => _movePaddle(e.localPosition),
                         onTapDown: (e) {
                           _focusNode.requestFocus(); // 클릭 후에도 스페이스가 먹도록
                           _movePaddle(e.localPosition);
                           _primaryAction();
                         },
-                        child: Stack(
-                          fit: StackFit.expand,
+                        child: Column(
                           children: [
-                            CustomPaint(
-                              size: size,
-                              painter: BrickPainter(_state),
+                            SizedBox(
+                              width: size.width,
+                              height: size.height,
+                              child: Stack(
+                                fit: StackFit.expand,
+                                children: [
+                                  CustomPaint(
+                                    size: size,
+                                    painter: BrickPainter(_state),
+                                  ),
+                                  _itemFlash(),
+                                  _overlay(),
+                                ],
+                              ),
                             ),
-                            _itemFlash(),
-                            _overlay(),
+                            // 경기장 아래 조작 공간 — 그리는 것은 없다
+                            const Expanded(child: SizedBox.expand()),
                           ],
                         ),
                       ),
