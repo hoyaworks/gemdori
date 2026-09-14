@@ -1,5 +1,4 @@
-# 저장소 전체에 걸리는 것만 둔다.
-# Flutter 빌드 산출물·IDE 파일은 gemdori/.gitignore 가 담당한다.
+# 저장소 루트 = Flutter 프로젝트 루트 (2026-09-14 — gemdori/ 하위에서 한 칸 올림)
 
 # OS
 Thumbs.db
@@ -8,3 +7,49 @@ Thumbs.db
 # 에디터
 .vscode/
 *.code-workspace
+
+# Miscellaneous
+*.class
+*.log
+*.pyc
+*.swp
+.DS_Store
+.atom/
+.build/
+.buildlog/
+.history
+.svn/
+.swiftpm/
+migrate_working_dir/
+
+# IntelliJ related
+*.iml
+*.ipr
+*.iws
+.idea/
+
+# The .vscode folder contains launch configuration and tasks you configure in
+# VS Code which you may wish to be included in version control, so this line
+# is commented out by default.
+#.vscode/
+
+# Flutter/Dart/Pub related
+**/doc/api/
+**/ios/Flutter/.last_build_id
+.dart_tool/
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+/build/
+/coverage/
+
+# Symbolication related
+app.*.symbols
+
+# Obfuscation related
+app.*.map.json
+
+# Android Studio will place build artifacts here
+/android/app/debug
+/android/app/profile
+/android/app/release
