@@ -4,6 +4,7 @@
 //
 //  주요 기능 : 앱 이름·테마를 정하고 홈(HomeScreen — 하단 탭 GAMES·RANKING·PROFILE)을 띄운다
 //              · 앱을 열 때 Firebase 를 준비하고 계정 확인(없으면 게스트 발급)을 시작해 둔다
+//              · 점수 올리기(ScoreReporter)를 앱 전체에서 찾을 수 있게 씌우고, 기기 기록과 서버 기록을 한 번 맞춘다
 //  제외 사항 : 게임 내용 · 화면 전환 · 로그인 판단 (app/firebase_account.dart)
 //
 //  상세 설명 : 게임이 늘어나도 이 파일은 손대지 않는다.
@@ -21,8 +22,12 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 
 import 'app/account.dart';
+import 'app/best_score.dart';
 import 'app/firebase_account.dart';
+import 'app/firebase_ranking.dart';
+import 'app/game_catalog.dart';
 import 'app/home_screen.dart';
+import 'app/score_reporter.dart';
 import 'firebase_options.dart';
 
 void main() {
@@ -30,8 +35,16 @@ void main() {
   final account = FirebaseAccountSource(
     ready: Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform),
   );
+  final scores = ScoreReporter(account: account, store: FirestoreRankingStore());
   unawaited(account.current()); // 앱을 열 때 확인·발급을 시작해 둔다 — 결과는 PROFILE 탭이 받아 간다
-  runApp(GemDoriApp(accountSource: account));
+  // 지난번에 못 올린 기록이 있으면 기기 최고 기록으로 맞춘다 (2026-09-15) — 계정 확인이 끝난 뒤에 돈다
+  unawaited(
+    scores.syncDeviceBests(
+      gameCatalog.map((g) => g.id),
+      (id) async => (await BestScores.open()).best(id),
+    ),
+  );
+  runApp(ScoreReporterScope(reporter: scores, child: GemDoriApp(accountSource: account)));
 }
 
 class GemDoriApp extends StatelessWidget {

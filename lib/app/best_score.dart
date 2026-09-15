@@ -4,7 +4,7 @@
 //
 //  주요 기능 : 게임별 최고 점수를 기기에 남기고 읽는다
 //  제외 사항 : 이 판의 점수를 기록해도 되는가 (각 게임 상태가 판단 — 벽돌깨기는 `BrickState.recordable`)
-//              · 서버 랭킹 (다음 단계 — Firebase)
+//              · 서버 랭킹 올리기 (score_reporter.dart)
 //
 //  상세 설명 : 브라우저에서는 localStorage, 폰에서는 앱 전용 저장소에 들어간다
 //    (shared_preferences 가 기기마다 알맞은 곳을 고른다).

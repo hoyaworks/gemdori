@@ -1,0 +1,61 @@
+rules_version = '2';
+
+// ═══════════════════════════════════════════════════════════════════
+//  firestore.rules — 겜도리 Firestore 보안 규칙
+// ═══════════════════════════════════════════════════════════════════
+//
+//  여기 적힌 경로만 열리고, 적히지 않은 경로는 전부 막힌다.
+//
+//  배포 : firebase deploy --only firestore:rules --project gemdori-7d4fb --account gemdoridev@gmail.com
+//  ⚠️ 이 파일이 정본이다 — 콘솔에서 직접 고치면 다음 배포 때 덮어써진다.
+//  ⚠️ 앱 배포(CI)와 따로 간다 — 규칙을 고쳤으면 위 명령으로 따로 올린다.
+//
+//  ⚠️ 무료 요금제라 서버 코드 검증이 없다. 여기서 막을 수 있는 것은
+//     「자기 문서만 · 모양이 맞게 · 점수는 올라가기만」까지다.
+//     점수 자체가 진짜인지는 ⑤ 점수 검증 단계에서 다룬다.
+//
+// ═══════════════════════════════════════════════════════════════════
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // 자기 계정으로 로그인한 요청인가
+    function isOwner(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+
+    // 목록에 있는 게임인가 — lib/app/game_catalog.dart 의 id 와 같아야 한다
+    function knownGame(gameId) {
+      return gameId in ['brick'];
+    }
+
+    // 올리는 문서의 모양이 맞는가
+    //   · 필드는 score · updatedAt (+ 다음 단계의 nickname) 만
+    //   · score 는 1 이상 정수 (상한 100000 은 오타·장난 방지용 넉넉한 값)
+    //   · updatedAt 은 서버 시각이어야 한다 — 기기 시각을 믿지 않는다
+    function validScore(d) {
+      return d.keys().hasOnly(['score', 'updatedAt', 'nickname'])
+          && d.keys().hasAll(['score', 'updatedAt'])
+          && d.score is int && d.score > 0 && d.score <= 100000
+          && d.updatedAt == request.time
+          && (!('nickname' in d)
+              || (d.nickname is string && d.nickname.size() >= 2 && d.nickname.size() <= 12));
+    }
+
+    // 게임별 랭킹 — 계정당 최고 점수 문서 1개 (문서 id = 계정 uid)
+    match /rankings/{gameId}/scores/{uid} {
+      // 랭킹은 누구나 본다 (점수·닉네임만 들어 있다)
+      allow read: if true;
+
+      // 처음 올릴 때
+      allow create: if isOwner(uid) && knownGame(gameId) && validScore(request.resource.data);
+
+      // 다시 올릴 때 — 점수는 올라가기만 한다
+      allow update: if isOwner(uid) && knownGame(gameId) && validScore(request.resource.data)
+                    && request.resource.data.score > resource.data.score;
+
+      // 지우기는 막는다 — 게스트 정리 규칙(검토 중)이 정해지면 그때 연다
+      allow delete: if false;
+    }
+  }
+}

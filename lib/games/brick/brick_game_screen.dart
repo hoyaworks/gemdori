@@ -19,6 +19,8 @@
 //
 // ═══════════════════════════════════════════════════════════════════
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
@@ -26,6 +28,7 @@ import 'package:flutter/services.dart';
 import '../../app/best_score.dart';
 import '../../app/dev_mode.dart';
 import '../../app/game_loading.dart';
+import '../../app/score_reporter.dart';
 import 'brick_painter.dart';
 import 'brick_state.dart';
 import 'dev_panel.dart';
@@ -166,7 +169,13 @@ class _BrickGameScreenState extends State<BrickGameScreen>
   Future<void> _submitScore() async {
     final store = _bestStore;
     if (store == null || !_state.recordable) return;
-    final isNew = await store.submit(BrickGameScreen.gameId, _state.score);
+    // 기다리기 전에 잡아 둔다 — 기다리는 사이 화면을 나가도 서버 전송은 끝까지 간다
+    final reporter = ScoreReporterScope.maybeOf(context);
+    final score = _state.score;
+    final isNew = await store.submit(BrickGameScreen.gameId, score);
+    // 서버 랭킹은 **기기 기록을 넘었을 때만** 올린다 (2026-09-15) — 같은 브라우저라 서버 기록이 기기 기록을 넘을 수 없다.
+    //   전송이 실패했으면 다음에 앱을 열 때 기기 기록으로 다시 맞춘다 (ScoreReporter.syncDeviceBests)
+    if (isNew && reporter != null) unawaited(reporter.report(BrickGameScreen.gameId, score));
     if (!mounted) return;
     setState(() => _newBest = isNew);
   }
