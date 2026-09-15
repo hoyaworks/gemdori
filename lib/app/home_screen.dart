@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import 'account.dart';
 import 'games_tab.dart';
 import 'profile_screen.dart';
 import 'ranking_screen.dart';
@@ -11,7 +10,7 @@ import 'ranking_screen.dart';
 //
 //  주요 기능 : 앱 제목과 하단 탭을 두고, 고른 탭의 본문을 띄운다
 //  제외 사항 : 탭 본문 (games_tab.dart · ranking_screen.dart · profile_screen.dart)
-//              · 게임 목록 (game_catalog.dart)
+//              · 게임 목록 (game_catalog.dart) · 계정·랭킹 서비스 (app_services.dart)
 //
 //  상세 설명 : 2026-09-15 게임 목록 한 장이던 홈을 탭 구성으로 바꿨다.
 //    게임 모음이 「점수 기록·랭킹·계정을 갖춘 서비스」로 가는 첫 틀이다.
@@ -27,10 +26,7 @@ import 'ranking_screen.dart';
 
 /// 홈 화면 — 하단 탭 틀
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key, this.accountSource = const PendingAccountSource()});
-
-  /// PROFILE 탭에 넘길 계정 정보 — main.dart 가 정한다
-  final AccountSource accountSource;
+  const HomeScreen({super.key});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -51,11 +47,7 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       body: IndexedStack(
         index: _tab,
-        children: [
-          const GamesTab(),
-          const RankingTab(),
-          ProfileTab(source: widget.accountSource),
-        ],
+        children: const [GamesTab(), RankingTab(), ProfileTab()],
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _tab,
