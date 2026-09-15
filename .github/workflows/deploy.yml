@@ -1,0 +1,79 @@
+# ═══════════════════════════════════════════════════════════════════
+#  deploy.yml — main 에 push 하면 테스트 → 웹 빌드 → GitHub Pages 배포
+# ═══════════════════════════════════════════════════════════════════
+#
+#  주요 기능 : 사람이 PC 에서 하던 3단계(테스트·빌드·gh-pages 교체)를
+#             GitHub 의 임시 서버가 대신 한다
+#  제외 사항 : 버전 태그 · 스토어 빌드(안드로이드·iOS) — 필요해지면 따로 만든다
+#
+#  상세 설명 : GitHub 가 이 파일을 읽고, push 때마다 리눅스 컴퓨터를 하나 띄워
+#    아래 steps 를 위에서부터 차례로 실행한다. 끝나면 그 컴퓨터는 사라진다.
+#    결과는 저장소 Actions 탭에 성공(초록)·실패(빨강)로 남는다.
+#
+#  ⭐ 주요 로직 : **테스트가 하나라도 실패하면 거기서 멈추고 배포하지 않는다.**
+#    step 은 앞 단계가 실패하면 다음으로 넘어가지 않으므로 순서만 지키면 된다.
+#    깨진 코드가 사이트에 나가는 것을 막는 것이 이 파일의 핵심이다.
+#
+#  ⭐ 주요 로직 : 배포는 **gh-pages 브랜치에 빌드 결과만** 올린다 (main 과 이력 분리).
+#    Pages 설정(Deploy from a branch · gh-pages / root)은 그대로 둔다.
+#
+#  ⚠️ 공개 저장소다 — 이 파일에 비밀값을 적지 않는다.
+#    배포 권한은 GitHub 가 실행마다 만들어 주는 GITHUB_TOKEN 으로 충분하다.
+#
+# ═══════════════════════════════════════════════════════════════════
+
+name: Test and Deploy
+
+on:
+  push:
+    branches: [main]
+  # Actions 탭에서 버튼으로 다시 돌릴 수 있게 (코드 변경 없이 재배포할 때)
+  workflow_dispatch:
+
+# GITHUB_TOKEN 에 gh-pages 브랜치로 push 할 권한을 준다. 기본은 읽기 전용이라 없으면 배포 단계에서 거절된다
+permissions:
+  contents: write
+
+# 연달아 push 하면 앞 실행을 취소하고 마지막 것만 배포한다
+#   — 두 실행이 동시에 gh-pages 를 덮어쓰면 옛 빌드가 나중에 올라갈 수 있다
+concurrency:
+  group: deploy-pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      # 로컬과 같은 버전으로 고정한다 — 버전이 다르면 「내 PC 에선 되는데」가 생긴다
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.38.9
+          cache: true
+
+      - name: Get packages
+        run: flutter pub get
+
+      - name: Test
+        run: flutter test
+
+      # 주소가 hoyaworks.github.io/gemdori/ 라서 base-href 가 필요하다. 주소 경로를 바꾸면 여기도 같이 바꾼다
+      - name: Build web
+        run: flutter build web --release --base-href /gemdori/
+
+      # GitHub 가 파일을 가공(Jekyll)하지 않게 한다. 없으면 _ 로 시작하는 파일이 빠질 수 있다
+      #   — 배포 액션도 기본으로 넣어 주지만, 기본값에 기대지 않고 직접 넣는다
+      - name: Add .nojekyll
+        run: touch build/web/.nojekyll
+
+      # build/web 내용으로 gh-pages 를 통째로 바꿔 끼운다 (옛 파일은 지워지고 이력은 이어진다)
+      - name: Deploy to gh-pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_branch: gh-pages
+          publish_dir: build/web
