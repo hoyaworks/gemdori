@@ -7,10 +7,10 @@ import 'account.dart';
 // ═══════════════════════════════════════════════════════════════════
 //
 //  주요 기능 : 닉네임 · 계정 종류(GUEST / MEMBER) · 아이디를 보여준다
-//  제외 사항 : 아이디 발급·로그인·닉네임 변경 (다음 단계) · 보일 모양 계산 (account.dart)
+//  제외 사항 : 아이디 발급·로그인 (firebase_account.dart) · 닉네임 변경 (다음 단계) · 보일 모양 계산 (account.dart)
 //
 //  상세 설명 : 계정 정보는 `AccountSource` 에게 받아 그리기만 한다.
-//    지금은 발급 전이라 닉네임·아이디가 `—` 로 보이는 것이 정상이다 (2026-09-15).
+//    닉네임은 아직 없어 `—` 로 보인다. 아이디는 발급이 끝나면 앞 8자가 보인다 (2026-09-15).
 //
 //  주요 로직 : 계정을 못 읽으면 **발급 전 게스트로 보인다** — 내 정보 칸이 오류로 막히면
 //    게임을 하는 데 아무 문제가 없는데도 앱이 고장 난 것처럼 보인다.
@@ -21,7 +21,7 @@ import 'account.dart';
 class ProfileTab extends StatefulWidget {
   const ProfileTab({super.key, this.source = const PendingAccountSource()});
 
-  /// 계정 정보를 주는 곳 — Firebase 를 붙일 때 여기로 실제 구현을 넘긴다
+  /// 계정 정보를 주는 곳 — 앱에서는 FirebaseAccountSource (main.dart 가 넘긴다)
   final AccountSource source;
 
   @override

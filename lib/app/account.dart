@@ -3,11 +3,11 @@
 // ═══════════════════════════════════════════════════════════════════
 //
 //  주요 기능 : 계정 종류(GUEST / MEMBER) · 아이디 · 닉네임과, 그것을 화면에 보일 모양
-//  제외 사항 : 아이디 발급·로그인 (다음 단계 — Firebase) · 화면 (profile_screen.dart)
+//  제외 사항 : 아이디 발급·로그인 (firebase_account.dart) · 화면 (profile_screen.dart)
 //
 //  상세 설명 : 화면은 `AccountSource` 에게 「지금 계정」을 묻기만 한다.
-//    지금은 발급 전 상태를 돌려주는 `PendingAccountSource` 가 그 자리에 있고,
-//    Firebase 를 붙일 때 **이 자리 하나만 실제 구현으로 바꿔 끼운다** — 화면은 손대지 않는다.
+//    앱에서는 `FirebaseAccountSource`(firebase_account.dart)가 그 자리에 들어가고 (2026-09-15),
+//    `PendingAccountSource` 는 Firebase 없이 도는 테스트용 자리다 — 화면은 둘을 구분하지 않는다.
 //
 //  ⭐ 주요 로직 : 발급 전에는 **기기에서 임시 아이디를 따로 만들지 않는다** (2026-09-15).
 //    만들면 나중에 Firebase 아이디와 두 개가 생겨 「어느 쪽이 내 아이디인가」가 흐려진다.
@@ -64,7 +64,7 @@ abstract interface class AccountSource {
   Future<Account> current();
 }
 
-/// Firebase 연결 전까지 쓰는 자리 — 아이디 발급 전의 게스트를 돌려준다
+/// Firebase 없이 쓰는 자리(테스트) — 아이디 발급 전의 게스트를 돌려준다
 class PendingAccountSource implements AccountSource {
   const PendingAccountSource();
 

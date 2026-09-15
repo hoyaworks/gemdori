@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'account.dart';
 import 'games_tab.dart';
 import 'profile_screen.dart';
 import 'ranking_screen.dart';
@@ -26,7 +27,10 @@ import 'ranking_screen.dart';
 
 /// 홈 화면 — 하단 탭 틀
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  const HomeScreen({super.key, this.accountSource = const PendingAccountSource()});
+
+  /// PROFILE 탭에 넘길 계정 정보 — main.dart 가 정한다
+  final AccountSource accountSource;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -47,7 +51,11 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       body: IndexedStack(
         index: _tab,
-        children: const [GamesTab(), RankingTab(), ProfileTab()],
+        children: [
+          const GamesTab(),
+          const RankingTab(),
+          ProfileTab(source: widget.accountSource),
+        ],
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _tab,
