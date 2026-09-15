@@ -50,10 +50,8 @@ void main() {
 
   unawaited(account.current()); // 앱을 열 때 확인·발급을 시작해 둔다
   unawaited(profile.nickname()); // 닉네임이 없으면 GUEST-#### 를 만들어 둔다
-  // 지난번에 못 올린 기록이 있으면 기기 최고 기록으로 맞춘다 — 계정 확인이 끝난 뒤에 돈다
-  unawaited(
-    scores.syncDeviceBests(gameIds, (id) async => (await BestScores.open()).best(id)),
-  );
+  // 지금 계정의 기기 기록과 서버 기록을 양쪽으로 맞춘다 — 계정 확인이 끝난 뒤에 돈다
+  unawaited(scores.syncDeviceBests(gameIds, BestScores.open));
 
   runApp(
     AppServices(

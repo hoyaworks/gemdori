@@ -63,6 +63,9 @@ class _BrickGameScreenState extends State<BrickGameScreen>
   /// 열지 못하면(사생활 보호 모드 등) null 로 두고 **기능만 조용히 끈다** — 기록은 곁가지다.
   BestScores? _bestStore;
 
+  /// 이 판을 하는 계정 — 기기 기록을 계정별로 나눈다 (2026-09-15). 모르면 null = 주인 없는 기록
+  String? _uid;
+
   /// 이번 판이 최고 기록을 새로 세웠는가 — 끝난 화면에 🏆 `NEW` 로 알린다
   bool _newBest = false;
 
@@ -141,6 +144,13 @@ class _BrickGameScreenState extends State<BrickGameScreen>
   //    `BrickState.recordable` 이 맡는다. 여기서는 **언제 낼지**와 **보여 주기**만 한다.
 
   Future<void> _openBestStore() async {
+    // 누구의 기록인지부터 — 3초 안에 계정을 못 받으면 주인 없는 기록으로 두고, 다음에 앱을 열 때 그 계정으로 옮겨진다
+    final account = AppServices.maybeOf(context)?.account;
+    try {
+      _uid = (await account?.current().timeout(const Duration(seconds: 3)))?.id;
+    } catch (_) {
+      // 계정을 몰라도 게임은 한다
+    }
     try {
       _bestStore = await BestScores.open();
     } catch (_) {
@@ -172,7 +182,7 @@ class _BrickGameScreenState extends State<BrickGameScreen>
     // 기다리기 전에 잡아 둔다 — 기다리는 사이 화면을 나가도 서버 전송은 끝까지 간다
     final reporter = AppServices.maybeOf(context)?.scores;
     final score = _state.score;
-    final isNew = await store.submit(BrickGameScreen.gameId, score);
+    final isNew = await store.submit(BrickGameScreen.gameId, score, uid: _uid);
     // 서버 랭킹은 **기기 기록을 넘었을 때만** 올린다 (2026-09-15) — 같은 브라우저라 서버 기록이 기기 기록을 넘을 수 없다.
     //   전송이 실패했으면 다음에 앱을 열 때 기기 기록으로 다시 맞춘다 (ScoreReporter.syncDeviceBests)
     if (isNew && reporter != null) unawaited(reporter.report(BrickGameScreen.gameId, score));

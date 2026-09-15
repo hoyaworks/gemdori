@@ -1,11 +1,12 @@
 import 'account.dart';
+import 'best_score.dart';
 
 // ═══════════════════════════════════════════════════════════════════
 //  score_reporter.dart — 점수를 서버 랭킹에 올린다 · 랭킹 저장소 약속
 // ═══════════════════════════════════════════════════════════════════
 //
 //  주요 기능 : 게임이 낸 점수를 **서버 기록보다 높을 때만** 내 랭킹 문서에 올린다
-//              · 앱을 열 때 기기 최고 기록과 서버 기록을 한 번 맞춘다
+//              · 앱을 열 때 지금 계정의 기기 기록과 서버 기록을 양쪽으로 맞춘다
 //              · 랭킹 저장소가 지킬 약속(RankingStore)과 순위 매기는 법(competitionRanks)
 //  제외 사항 : 서버 읽기·쓰기 자체 (firebase_ranking.dart) · 「이 판을 기록해도 되나」 (각 게임 상태)
 //              · 랭킹 화면 (ranking_screen.dart) · 점수가 진짜인지 검증 (⑤ 단계)
@@ -95,19 +96,39 @@ class ScoreReporter {
     }
   }
 
-  /// 앱을 열 때 — 기기 최고 기록이 서버보다 높으면 올린다 (지난번 전송 실패 보충)
+  /// 앱을 열 때 — 지금 계정의 기기 기록과 서버 기록을 **양쪽으로** 맞춘다 (2026-09-15)
+  ///   · 주인 없는 기기 기록(예전 기록·계정 발급 전 판)을 먼저 지금 계정으로 옮긴다
+  ///   · 기기가 높으면 서버에 올린다 (지난번 전송 실패 보충)
+  ///   · 서버가 높으면 기기를 서버 값으로 채운다 (새 기기에서 로그인한 회원의 🏆·NEW 가 틀리지 않게)
   Future<void> syncDeviceBests(
     Iterable<String> gameIds,
-    Future<int> Function(String gameId) deviceBest,
+    Future<BestScores> Function() openDevice,
   ) async {
-    for (final id in gameIds) {
-      final int best;
-      try {
-        best = await deviceBest(id);
-      } catch (_) {
-        continue; // 기기 기록을 못 읽는 게임은 건너뛴다
+    try {
+      final uid = (await _account.current()).id;
+      if (uid == null || uid.isEmpty) return;
+      final device = await openDevice();
+      await device.adoptUnassigned(uid, gameIds);
+      for (final id in gameIds) {
+        final int? server;
+        try {
+          server = await _store.bestOf(id, uid);
+        } catch (_) {
+          continue; // 서버를 못 읽는 게임은 건너뛴다 — 다음에 열 때 다시
+        }
+        final local = device.best(id, uid: uid);
+        if (server != null && server > local) {
+          await device.raiseTo(id, server, uid: uid);
+        } else if (local > (server ?? 0)) {
+          try {
+            await _store.save(id, uid, local, nickname: await _nicknameOrNull());
+          } catch (_) {
+            // 다음에 열 때 다시
+          }
+        }
       }
-      await report(id, best);
+    } catch (_) {
+      // 계정·기기 저장소를 못 열면 이번에는 건너뛴다
     }
   }
 

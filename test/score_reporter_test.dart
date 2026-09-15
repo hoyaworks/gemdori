@@ -1,11 +1,14 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:gemdori/app/best_score.dart';
 import 'package:gemdori/app/score_reporter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'fakes.dart';
 
 // 점수 올리기 — 서버 기록보다 높을 때만 · 닉네임 사본 · 실패해도 멈추지 않음 · 앱 열 때 기기 기록 맞추기 · 순위
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
   const uid = 'Xy7kQ2mN9pLr4sTu1vWz3aBc5dEf';
 
   test('서버 기록이 없으면 올린다', () async {
@@ -69,25 +72,57 @@ void main() {
     expect(store.writes, 0);
   });
 
-  test('앱을 열 때 기기 기록이 서버보다 높은 게임만 올린다', () async {
-    final store = FakeRankingStore()..put('old', uid, 90);
-    final r = ScoreReporter(account: FakeAccount(uid), store: store);
-    const device = {'brick': 50, 'empty': 0, 'old': 80};
-    await r.syncDeviceBests(device.keys, (id) async => device[id]!);
-    expect(store.docs['brick/$uid']!.score, 50);
-    expect(store.docs.containsKey('empty/$uid'), isFalse);
-    expect(store.docs['old/$uid']!.score, 90, reason: '서버가 더 높으면 그대로');
-    expect(store.writes, 1);
-  });
+  group('앱 열 때 기기 ↔ 서버 맞추기', () {
+    setUp(() => SharedPreferences.setMockInitialValues({}));
 
-  test('기기 기록을 못 읽는 게임은 건너뛰고 나머지는 맞춘다', () async {
-    final store = FakeRankingStore();
-    final r = ScoreReporter(account: FakeAccount(uid), store: store);
-    await r.syncDeviceBests(['broken', 'brick'], (id) async {
-      if (id == 'broken') throw Exception('storage blocked');
-      return 40;
+    test('기기가 높으면 서버에 올린다 · 기록 없는 게임은 건드리지 않는다', () async {
+      final device = await BestScores.open();
+      await device.submit('brick', 50, uid: uid);
+      final store = FakeRankingStore();
+      final r = ScoreReporter(account: FakeAccount(uid), store: store, nickname: () async => 'ME');
+      await r.syncDeviceBests(['brick', 'empty'], BestScores.open);
+      expect(store.docs['brick/$uid']!.score, 50);
+      expect(store.docs['brick/$uid']!.nickname, 'ME');
+      expect(store.docs.containsKey('empty/$uid'), isFalse);
     });
-    expect(store.docs['brick/$uid']!.score, 40);
+
+    test('서버가 높으면 기기를 서버 값으로 채운다 — 새 기기에서 로그인한 회원', () async {
+      final store = FakeRankingStore()..put('brick', uid, 90);
+      final r = ScoreReporter(account: FakeAccount(uid), store: store);
+      await r.syncDeviceBests(['brick'], BestScores.open);
+      expect((await BestScores.open()).best('brick', uid: uid), 90);
+      expect(store.writes, 0);
+    });
+
+    test('주인 없는 기록(예전 기록)을 먼저 지금 계정으로 옮긴 뒤 맞춘다', () async {
+      final device = await BestScores.open();
+      await device.submit('brick', 40);
+      final store = FakeRankingStore();
+      final r = ScoreReporter(account: FakeAccount(uid), store: store);
+      await r.syncDeviceBests(['brick'], BestScores.open);
+      expect(store.docs['brick/$uid']!.score, 40);
+      expect(device.best('brick'), 0, reason: '주인 없는 쪽은 지워진다');
+      expect(device.best('brick', uid: uid), 40);
+    });
+
+    test('아이디가 없으면 아무것도 하지 않는다 — 주인 없는 기록도 그대로', () async {
+      final device = await BestScores.open();
+      await device.submit('brick', 40);
+      final store = FakeRankingStore();
+      await ScoreReporter(account: FakeAccount(null), store: store)
+          .syncDeviceBests(['brick'], BestScores.open);
+      expect(store.writes, 0);
+      expect(device.best('brick'), 40);
+    });
+
+    test('서버를 못 읽으면 그 게임은 건너뛴다 — 오류 없이', () async {
+      final device = await BestScores.open();
+      await device.submit('brick', 40, uid: uid);
+      final store = FakeRankingStore()..failRead = true;
+      await ScoreReporter(account: FakeAccount(uid), store: store)
+          .syncDeviceBests(['brick'], BestScores.open);
+      expect(store.writes, 0);
+    });
   });
 
   group('순위 매기기', () {

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'app_services.dart';
 import 'best_score.dart';
 import 'game_catalog.dart';
 
@@ -43,10 +44,18 @@ class _GamesTabState extends State<GamesTab> {
   }
 
   Future<void> _loadBest() async {
+    // 🏆 는 **지금 계정의** 기록이다 (2026-09-15) — 계정을 3초 안에 못 받으면 주인 없는 기록만 보인다
+    final account = AppServices.maybeOf(context)?.account;
+    String? uid;
+    try {
+      uid = (await account?.current().timeout(const Duration(seconds: 3)))?.id;
+    } catch (_) {
+      // 계정을 몰라도 점수 칸은 띄운다
+    }
     try {
       final store = await BestScores.open();
       if (!mounted) return;
-      setState(() => _best = {for (final g in gameCatalog) g.id: store.best(g.id)});
+      setState(() => _best = {for (final g in gameCatalog) g.id: store.best(g.id, uid: uid)});
     } catch (_) {
       // 저장소를 못 열면 점수 표시만 빠진다
     }
