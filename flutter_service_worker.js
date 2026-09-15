@@ -5,8 +5,8 @@ const CACHE_NAME = 'flutter-app-cache';
 
 const RESOURCES = {"manifest.json": "f6c283952dd0456fd30211640866fb38",
 "version.json": "cced3972c5bcc463ef4a06933beade22",
-"main.dart.js": "3f97018eb23fad69d3e54294cbbbfdcc",
-"flutter_bootstrap.js": "306dbb7904f8ccaa23c09193ca2fea43",
+"main.dart.js": "97cbc0d0af50c92118df93d4bd7bdc1c",
+"flutter_bootstrap.js": "4b4b2d69344ee52d09a40d8a96a085fb",
 "icons/Icon-maskable-512.png": "301a7604d45b3e739efc881eb04896ea",
 "icons/Icon-192.png": "ac9a721a12bbc803b44f645561ecb1e1",
 "icons/Icon-maskable-192.png": "c457ef57daa1d16f64b27b786ec2ea3c",
@@ -41,7 +41,7 @@ const RESOURCES = {"manifest.json": "f6c283952dd0456fd30211640866fb38",
 "assets/assets/audio/wall.wav": "5a4d7706243b601dab27cda71dacff05",
 "assets/assets/audio/ball_lost.wav": "1eb72678d7d409aae9cc43f2c3ca4860",
 "assets/FontManifest.json": "dc3d03800ccca4601324923c0b1d6d57",
-"assets/NOTICES": "58651838fb64ff1238227f6a077bde36",
+"assets/NOTICES": "a0daebec71c6d26a8595b6a9ea9defc2",
 "flutter.js": "24bc71911b75b5f8135c949e27a2984e"};
 // The application shell files that are downloaded before a service worker can
 // start.
